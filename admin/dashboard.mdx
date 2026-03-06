@@ -1,0 +1,143 @@
+---
+title: 'Admin Dashboard'
+description: 'Overview of the administrative dashboard and platform statistics'
+icon: 'gauge-high'
+---
+
+The Admin Dashboard provides a comprehensive overview of your Discord Webhook Manager platform, including user statistics, system activity, and quick access to administrative functions.
+
+## Access Requirements
+
+<Warning>
+  **Admin Role Required**: Only users with the `admin` role can access the administrative panel. All admin routes are protected by:
+  - `auth` middleware (must be logged in)
+  - `verified` middleware (email must be verified)
+  - `admin` middleware (user role must be 'admin')
+  - `password.confirm` middleware (recent password confirmation required)
+</Warning>
+
+## Accessing the Dashboard
+
+Navigate to `/admin` to access the administrative dashboard. You'll be prompted to confirm your password if you haven't done so recently.
+
+```php
+// Route definition from web.php:107
+Route::middleware(['admin', 'password.confirm'])->group(function () {
+    Route::get('admin', function () {
+        // Dashboard logic
+    })->name('admin');
+});
+```
+
+## Platform Statistics
+
+The dashboard displays key metrics about your platform:
+
+<CardGroup cols={2}>
+  <Card title="User Metrics" icon="users">
+    - **Total Users**: All registered users on the platform
+    - **Admin Users**: Number of users with admin privileges
+    - **Recent Users**: Latest 10 user registrations
+  </Card>
+  
+  <Card title="Activity Metrics" icon="chart-line">
+    - **Total Webhooks**: All webhooks created across the platform
+    - **Total Messages**: All messages sent through the system
+    - **Scheduled Messages**: Total number of scheduled messages
+  </Card>
+</CardGroup>
+
+### Statistics Breakdown
+
+The dashboard queries provide real-time statistics:
+
+```php
+$stats = [
+    'totalUsers' => \App\Models\User::count(),
+    'adminUsers' => \App\Models\User::where('role', 'admin')->count(),
+    'totalWebhooks' => \App\Models\Webhook::count(),
+    'totalMessages' => \App\Models\MessageHistory::count(),
+    'totalScheduledMessages' => \App\Models\ScheduledMessage::count(),
+];
+```
+
+## Quick Actions
+
+From the admin dashboard, you can quickly access:
+
+<Steps>
+  <Step title="User Management">
+    View all users, manage AI permissions, and delete user accounts
+  </Step>
+  
+  <Step title="Scheduled Messages">
+    Monitor and manage all scheduled messages across the platform
+  </Step>
+  
+  <Step title="Platform Settings">
+    Configure system-wide settings including AI integration and authentication
+  </Step>
+</Steps>
+
+## Recent Activity
+
+The dashboard displays the 10 most recently registered users, including:
+- User name
+- Email address
+- Registration date
+- Current role (user/admin)
+- AI access status
+
+## Navigation
+
+The admin panel uses the same navigation structure as the main application, with additional admin-specific menu items:
+
+- **Dashboard** (`/admin`) - Main admin overview
+- **User Management** (Embedded in dashboard) - User administration
+- **Scheduled Messages** (`/admin/scheduled-messages`) - Global message management
+- **Settings** (Embedded in dashboard) - Platform configuration
+
+<Note>
+  All administrative actions are logged and can be monitored through the application's audit system.
+</Note>
+
+## Security Considerations
+
+<Warning>
+  **Password Confirmation**: All admin routes require recent password confirmation. If you haven't confirmed your password in the last 3 hours, you'll be prompted to do so before accessing admin features.
+</Warning>
+
+### Admin Role Check
+
+The system verifies admin access through the `User` model:
+
+```php
+public function isAdmin(): bool
+{
+    return $this->role === 'admin';
+}
+```
+
+If a non-admin user attempts to access admin routes, they'll receive a 403 Forbidden error:
+
+```php
+if (!$request->user() || !$request->user()->isAdmin()) {
+    abort(403, 'Unauthorized. Admin access required.');
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="User Management" icon="users-gear" href="/admin/user-management">
+    Learn how to manage users and AI permissions
+  </Card>
+  
+  <Card title="Scheduled Messages" icon="clock" href="/admin/scheduled-messages">
+    Monitor and control scheduled messages platform-wide
+  </Card>
+  
+  <Card title="Platform Settings" icon="gear" href="/admin/settings">
+    Configure system-wide settings and integrations
+  </Card>
+</CardGroup>

@@ -1,0 +1,300 @@
+---
+title: 'Webhook Management'
+description: 'Create, validate, organize, and share Discord webhooks with advanced permission controls'
+icon: 'webhook'
+---
+
+## Overview
+
+Webhook Management is the core feature of Discord Webhook Manager. It allows you to store, organize, and manage your Discord webhooks in a centralized dashboard with automatic validation, metadata detection, and collaboration features.
+
+## Creating a Webhook
+
+<Steps>
+  <Step title="Navigate to Webhooks">
+    Go to the Webhooks page from the sidebar menu.
+  </Step>
+  
+  <Step title="Click Create Webhook">
+    Click the "New Webhook" button in the top right corner.
+  </Step>
+  
+  <Step title="Enter Webhook Details">
+    Fill in the webhook information:
+    
+    <ParamField path="webhook_url" type="string" required>
+      Your Discord webhook URL. Must start with `https://discord.com/api/webhooks/` or `https://discordapp.com/api/webhooks/`
+      
+      The system will automatically validate this URL with Discord's API.
+    </ParamField>
+    
+    <ParamField path="name" type="string">
+      Custom name for your webhook. If left empty, the system will auto-fill this from Discord.
+    </ParamField>
+    
+    <ParamField path="avatar_url" type="string">
+      Custom avatar URL for the webhook. Auto-filled from Discord if not provided.
+    </ParamField>
+    
+    <ParamField path="description" type="string">
+      Optional description to help you remember what this webhook is used for (max 1000 characters).
+    </ParamField>
+    
+    <ParamField path="tags" type="array">
+      Add tags to organize your webhooks (e.g., "announcements", "moderation", "logs").
+    </ParamField>
+  </Step>
+  
+  <Step title="Automatic Validation">
+    When you submit the form, the system:
+    - Validates the webhook URL with Discord's API
+    - Auto-fills the webhook name and avatar from Discord if not provided
+    - Extracts and stores metadata (guild_id, channel_id)
+    - Checks for duplicate webhooks and warns you
+    
+    <Warning>
+      If the webhook URL is invalid or no longer exists, you'll receive an error message.
+    </Warning>
+  </Step>
+</Steps>
+
+## Webhook Dashboard
+
+The webhook dashboard shows all your webhooks with key information:
+
+- **Webhook Name & Avatar**: Visual identification of each webhook
+- **Description & Tags**: Organizational metadata
+- **Message Count**: Total messages sent through this webhook
+- **Last Activity**: Recent message activity (last 7 days)
+- **Permission Level**: Shows if you're the owner or a collaborator
+
+### Filtering Webhooks
+
+You can filter webhooks by:
+- **Ownership**: View only your webhooks or shared webhooks
+- **Tags**: Filter by specific tags
+- **Search**: Search by name or description
+
+## Webhook Details & Statistics
+
+Click on any webhook to view detailed statistics:
+
+<Tabs>
+  <Tab title="Overview">
+    - Total messages sent
+    - Success rate
+    - Failed messages count
+    - Recent activity (last 7 days)
+    - Associated templates
+    - Scheduled messages
+  </Tab>
+  
+  <Tab title="Message History">
+    View the complete history of messages sent through this webhook:
+    - Timestamp of each message
+    - Message content preview
+    - Status (success/failed)
+    - User who sent the message
+    - Discord API response
+    
+    <Note>
+      Message history is paginated and shows 20 messages per page.
+    </Note>
+  </Tab>
+  
+  <Tab title="Settings">
+    Edit webhook configuration:
+    - Update webhook URL (with re-validation)
+    - Change name and avatar
+    - Modify description and tags
+    - Manage collaborators
+    - Delete webhook
+  </Tab>
+</Tabs>
+
+## Organizing Webhooks
+
+### Tags System
+
+Tags help you organize webhooks by purpose or category:
+
+```json
+{
+  "tags": ["announcements", "production", "critical"]
+}
+```
+
+Each tag can be up to 50 characters and you can add multiple tags per webhook.
+
+### Description Best Practices
+
+Add detailed descriptions to help team members understand:
+- What the webhook is used for
+- Which Discord server/channel it targets
+- When it should be used
+- Any special considerations
+
+## Sharing & Collaboration
+
+### Permission Levels
+
+Webhooks can be shared with other users with three permission levels:
+
+<CodeGroup>
+```json Owner
+{
+  "permission_level": "owner",
+  "permissions": [
+    "view",
+    "edit",
+    "send",
+    "delete",
+    "manage_collaborators"
+  ]
+}
+```
+
+```json Admin
+{
+  "permission_level": "admin",
+  "permissions": [
+    "view",
+    "edit",
+    "send",
+    "invite_users"
+  ]
+}
+```
+
+```json Editor
+{
+  "permission_level": "editor",
+  "permissions": [
+    "view",
+    "edit",
+    "send"
+  ]
+}
+```
+
+```json Viewer
+{
+  "permission_level": "viewer",
+  "permissions": [
+    "view",
+    "view_history"
+  ]
+}
+```
+</CodeGroup>
+
+### Inviting Collaborators
+
+<Steps>
+  <Step title="Open Webhook Settings">
+    Navigate to the webhook you want to share and click on "Settings" or "Collaborators".
+  </Step>
+  
+  <Step title="Send Invitation">
+    Enter the email address of the user you want to invite and select their permission level.
+    
+    The user will receive an email invitation with a unique token.
+  </Step>
+  
+  <Step title="Accept Invitation">
+    The invited user can accept or decline the invitation from their dashboard.
+    
+    Invitations expire after a certain period for security.
+  </Step>
+</Steps>
+
+### Managing Collaborators
+
+As the webhook owner, you can:
+- View all current collaborators
+- Change permission levels
+- Remove collaborators
+- Cancel pending invitations
+
+Collaborators can leave shared webhooks at any time from their dashboard.
+
+## Updating Webhooks
+
+### Changing the Webhook URL
+
+<Warning>
+  When you change a webhook URL, the system re-validates it with Discord's API. If the new URL is invalid, the update will fail.
+</Warning>
+
+If the URL changes:
+1. The system validates the new URL
+2. Updates guild_id and channel_id metadata
+3. Auto-fills name and avatar from Discord if they were cleared
+4. All associated templates and scheduled messages are automatically updated
+
+### Editing Metadata
+
+You can update webhook metadata at any time:
+- Name (max 255 characters)
+- Avatar URL
+- Description (max 1000 characters)  
+- Tags (array of strings)
+
+Changes are saved immediately and reflected across all views.
+
+## Deleting Webhooks
+
+<Warning>
+  Deleting a webhook is permanent and will:
+  - Remove the webhook from your dashboard
+  - Delete all message history
+  - Remove all collaborator access
+  - Delete associated scheduled messages
+  - Remove webhook references from templates
+  
+  This action cannot be undone!
+</Warning>
+
+Only the webhook owner can delete a webhook. Collaborators must leave the shared webhook instead.
+
+## Best Practices
+
+1. **Use Descriptive Names**: Give your webhooks clear, descriptive names that indicate their purpose
+
+2. **Tag Everything**: Use tags consistently to group related webhooks (e.g., "production", "staging", "notifications")
+
+3. **Document with Descriptions**: Add detailed descriptions explaining when and how to use each webhook
+
+4. **Regular Audits**: Periodically review your webhook list and remove unused webhooks
+
+5. **Permission Management**: Grant the minimum necessary permissions to collaborators
+
+6. **Monitor Activity**: Check message history regularly to catch any issues or unauthorized usage
+
+## Technical Details
+
+### Supported Webhook URLs
+
+Both Discord domains are supported:
+- `https://discord.com/api/webhooks/{id}/{token}`
+- `https://discordapp.com/api/webhooks/{id}/{token}`
+
+### Metadata Storage
+
+The system automatically extracts and stores:
+- `guild_id`: The Discord server ID
+- `channel_id`: The channel ID where messages will be posted
+- `name`: Webhook name from Discord
+- `avatar_url`: Default webhook avatar
+
+This metadata is used for display purposes and validation.
+
+### Duplicate Detection
+
+When creating a webhook, the system checks if the same webhook URL already exists in your account. If found, you'll be warned but can choose to create it anyway (useful for having the same webhook in multiple organizational categories).
+
+## Related Features
+
+- [Message Editor](/features/message-editor) - Send messages through your webhooks
+- [Templates](/features/templates) - Create reusable message templates for your webhooks  
+- [Scheduled Messages](/features/scheduled-messages) - Schedule automated messages

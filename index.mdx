@@ -1,97 +1,183 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Discord Webhook Manager"
+description: "A powerful SaaS platform for managing, scheduling, and automating Discord webhook messages with team collaboration and AI-powered content generation."
 ---
 
-## Setting up
+<div className="hero-section" style={{
+  background: 'linear-gradient(135deg, rgba(7, 211, 180, 0.1) 0%, rgba(11, 23, 23, 0.95) 100%)',
+  borderRadius: '12px',
+  padding: '3rem 2rem',
+  marginBottom: '3rem',
+  border: '1px solid rgba(7, 211, 180, 0.2)'
+}}>
+  <h1 style={{
+    fontSize: '3rem',
+    fontWeight: '700',
+    marginBottom: '1rem',
+    background: 'linear-gradient(135deg, #07d3b4 0%, #0c698c 100%)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text'
+  }}>
+    Manage Discord Webhooks Like a Pro
+  </h1>
+  <p style={{
+    fontSize: '1.25rem',
+    color: '#e1e1e1',
+    marginBottom: '2rem',
+    maxWidth: '800px'
+  }}>
+    Create, schedule, and automate professional Discord messages with a visual editor, team collaboration, and AI-powered content generation.
+  </p>
+</div>
 
-Get your documentation site up and running in minutes.
+## Get Started
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+Everything you need to start managing Discord webhooks effectively.
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
+<CardGroup cols={2}>
   <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
+    title="Introduction"
+    icon="book-open"
+    href="/introduction"
   >
-    Edit your docs locally and preview them in real time.
+    Learn about Discord Webhook Manager and its features
   </Card>
   <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
+    title="Quick Start"
+    icon="rocket"
+    href="/quickstart"
   >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+    Set up your first webhook and send a message in minutes
   </Card>
   <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
+    title="Installation Guide"
+    icon="server"
+    href="/installation"
   >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+    Deploy Discord Webhook Manager on your own infrastructure
   </Card>
   <Card
-    title="Code samples"
+    title="API Reference"
     icon="code"
-    href="/essentials/code"
+    href="/api/overview"
   >
-    Add sample code to demonstrate how to use your product.
+    Integrate webhook management into your applications
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+</CardGroup>
 
-## Need inspiration?
+## Core Features
+
+Powerful tools to streamline your Discord communication workflow.
+
+<CardGroup cols={3}>
+  <Card
+    title="Webhook Management"
+    icon="webhook"
+    href="/features/webhooks"
+  >
+    Create, validate, and organize Discord webhooks with auto-detection
+  </Card>
+  <Card
+    title="Scheduled Messages"
+    icon="clock"
+    href="/features/scheduled-messages"
+  >
+    Schedule one-time or recurring messages with timezone support
+  </Card>
+  <Card
+    title="Message Templates"
+    icon="file-lines"
+    href="/features/templates"
+  >
+    Save and reuse message designs with dynamic variables
+  </Card>
+  <Card
+    title="Team Collaboration"
+    icon="users"
+    href="/collaboration/team-invitations"
+  >
+    Share webhooks with granular permission controls
+  </Card>
+  <Card
+    title="AI Generation"
+    icon="sparkles"
+    href="/advanced/ai-generation"
+  >
+    Generate message content with OpenAI or Google Gemini
+  </Card>
+  <Card
+    title="Message History"
+    icon="chart-line"
+    href="/advanced/message-history"
+  >
+    Track all sent messages with detailed analytics
+  </Card>
+</CardGroup>
+
+## For Administrators
+
+Comprehensive tools for platform management and monitoring.
+
+<CardGroup cols={2}>
+  <Card
+    title="Admin Dashboard"
+    icon="gauge"
+    href="/admin/dashboard"
+  >
+    Monitor platform usage and manage users
+  </Card>
+  <Card
+    title="User Management"
+    icon="user-gear"
+    href="/admin/user-management"
+  >
+    Control user access and AI feature permissions
+  </Card>
+  <Card
+    title="Scheduled Messages Management"
+    icon="calendar-check"
+    href="/admin/scheduled-messages"
+  >
+    View and manage all scheduled messages across users
+  </Card>
+  <Card
+    title="Platform Settings"
+    icon="sliders"
+    href="/admin/settings"
+  >
+    Configure AI providers, registration, and system settings
+  </Card>
+</CardGroup>
+
+## Why Discord Webhook Manager?
+
+<AccordionGroup>
+  <Accordion title="Visual Message Editor" icon="paintbrush">
+    Design Discord messages with a real-time preview that matches Discord's appearance exactly. Support for embeds, mentions, custom colors, and all Discord message components.
+  </Accordion>
+  
+  <Accordion title="Automation & Scheduling" icon="robot">
+    Schedule messages for specific dates and times, or set up recurring messages (daily, weekly, monthly). Attach files that are automatically cleaned up after sending to save storage.
+  </Accordion>
+  
+  <Accordion title="Team Collaboration" icon="handshake">
+    Invite team members to collaborate on webhooks with role-based permissions (Admin, Editor, Viewer). Share templates and manage access across your organization.
+  </Accordion>
+  
+  <Accordion title="AI-Powered Content" icon="wand-magic-sparkles">
+    Generate message content automatically using OpenAI GPT or Google Gemini. Perfect for creating engaging announcements, updates, and notifications.
+  </Accordion>
+</AccordionGroup>
+
+## Open Source
+
+Discord Webhook Manager is open source and available on GitHub.
 
 <Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
+  title="View on GitHub"
+  icon="github"
+  href="https://github.com/edgarqs/DiscordWebhook"
 >
-  Browse our showcase of exceptional documentation sites.
+  Contribute, report issues, or fork the project
 </Card>

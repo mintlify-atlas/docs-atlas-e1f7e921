@@ -1,0 +1,313 @@
+---
+title: 'Team Invitations'
+description: 'Learn how to invite team members to collaborate on webhooks and templates'
+icon: 'envelope'
+---
+
+## Overview
+
+The Discord Webhook Manager allows you to invite other registered users to collaborate on your webhooks and templates. Invitations are sent via email and expire after 7 days for security.
+
+<Note>
+  Only users who already have an account can be invited. The invitee must be registered with the email address you're inviting.
+</Note>
+
+## How Invitations Work
+
+The invitation system uses secure token-based authentication to ensure only authorized users can accept invitations.
+
+<Steps>
+  <Step title="Send Invitation">
+    The webhook owner or admin sends an invitation by entering the collaborator's email address and selecting their permission level.
+    
+    ```php
+    // CollaboratorController.php:95-102
+    $invitation = $webhook->invitations()->create([
+        'inviter_id' => auth()->id(),
+        'invitee_email' => $validated['email'],
+        'permission_level' => $validated['permission_level'],
+        'token' => Str::random(32),
+        'status' => 'pending',
+        'expires_at' => now()->addDays(7),
+    ]);
+    ```
+  </Step>
+
+  <Step title="Email Notification">
+    The invitee receives an email notification with a secure invitation link containing a unique token.
+    
+    ```php
+    // CollaboratorController.php:105
+    $invitee->notify(new WebhookInvitationNotification($invitation));
+    ```
+  </Step>
+
+  <Step title="Accept or Decline">
+    The invitee can view the invitation details and choose to accept or decline. Accepted invitations create a new collaborator record with the specified permission level.
+    
+    ```php
+    // InvitationController.php:92-99
+    WebhookCollaborator::create([
+        'webhook_id' => $invitation->webhook_id,
+        'user_id' => auth()->id(),
+        'permission_level' => $invitation->permission_level,
+        'invited_by' => $invitation->inviter_id,
+        'invited_at' => now(),
+        'accepted_at' => now(),
+    ]);
+    ```
+  </Step>
+</Steps>
+
+## Invitation States
+
+Invitations can be in one of four states:
+
+<CardGroup cols={2}>
+  <Card title="Pending" icon="clock">
+    The invitation has been sent and is awaiting a response. Valid for 7 days.
+  </Card>
+  
+  <Card title="Accepted" icon="check">
+    The invitee accepted the invitation and is now a collaborator.
+  </Card>
+  
+  <Card title="Declined" icon="xmark">
+    The invitee declined the invitation.
+  </Card>
+  
+  <Card title="Cancelled" icon="ban">
+    The inviter or webhook owner cancelled the invitation before it was accepted.
+  </Card>
+</CardGroup>
+
+## Sending Invitations
+
+### Requirements
+
+To send invitations, you must:
+
+- Be the webhook owner, or
+- Have **Admin** permission level on the webhook
+
+<Warning>
+  You cannot invite yourself or users who are already collaborators. The system will validate this and return an error.
+</Warning>
+
+### Validation Rules
+
+The system performs several checks before creating an invitation:
+
+<Accordion title="Email Validation">
+  ```php
+  // CollaboratorController.php:49-52
+  $validated = $request->validate([
+      'email' => 'required|email',
+      'permission_level' => 'required|in:admin,editor,viewer',
+  ]);
+  ```
+  
+  The email must be valid and the user must exist in the system.
+</Accordion>
+
+<Accordion title="User Existence Check">
+  ```php
+  // CollaboratorController.php:55-61
+  $invitee = User::where('email', $validated['email'])->first();
+  
+  if (!$invitee) {
+      return back()->withErrors([
+          'email' => 'No user found with this email address.',
+      ]);
+  }
+  ```
+</Accordion>
+
+<Accordion title="Self-Invitation Prevention">
+  ```php
+  // CollaboratorController.php:64-68
+  if ($invitee->id === $webhook->user_id) {
+      return back()->withErrors([
+          'email' => 'You cannot invite yourself as a collaborator.',
+      ]);
+  }
+  ```
+</Accordion>
+
+<Accordion title="Duplicate Collaborator Check">
+  ```php
+  // CollaboratorController.php:71-79
+  $existingCollaborator = $webhook->collaborators()
+      ->where('user_id', $invitee->id)
+      ->first();
+  
+  if ($existingCollaborator) {
+      return back()->withErrors([
+          'email' => 'This user is already a collaborator.',
+      ]);
+  }
+  ```
+</Accordion>
+
+<Accordion title="Pending Invitation Check">
+  ```php
+  // CollaboratorController.php:82-92
+  $existingInvitation = $webhook->invitations()
+      ->where('invitee_email', $validated['email'])
+      ->where('status', 'pending')
+      ->where('expires_at', '>', now())
+      ->first();
+  
+  if ($existingInvitation) {
+      return back()->withErrors([
+          'email' => 'There is already a pending invitation for this user.',
+      ]);
+  }
+  ```
+</Accordion>
+
+## Managing Invitations
+
+### Viewing Pending Invitations
+
+Collaborators can view their pending invitations:
+
+```php
+// InvitationController.php:17-22
+$invitations = Invitation::where('invitee_email', auth()->user()->email)
+    ->where('status', 'pending')
+    ->where('expires_at', '>', now())
+    ->with(['webhook:id,name,description', 'inviter:id,name'])
+    ->latest()
+    ->get();
+```
+
+### Accepting Invitations
+
+When accepting an invitation, the system:
+
+1. Verifies the invitation is for the current user
+2. Checks if the invitation is still pending and not expired
+3. Creates a collaborator record with the specified permission level
+4. Updates the invitation status to "accepted"
+
+<Note>
+  If you're already a collaborator when accepting an invitation (edge case), the system will simply mark the invitation as accepted and notify you.
+</Note>
+
+### Declining Invitations
+
+Declining an invitation simply updates its status:
+
+```php
+// InvitationController.php:126
+$invitation->update(['status' => 'declined']);
+```
+
+Declined invitations remain in the database for audit purposes but are not shown in the pending invitations list.
+
+### Cancelling Sent Invitations
+
+Inviters and webhook owners can cancel pending invitations:
+
+```php
+// InvitationController.php:148-149
+if ($invitation->inviter_id !== auth()->id() && $invitation->webhook->user_id !== auth()->id()) {
+    abort(403, 'You are not authorized to cancel this invitation.');
+}
+```
+
+<Warning>
+  Only the invitation sender or the webhook owner can cancel an invitation. Other admins cannot cancel invitations they didn't send.
+</Warning>
+
+## Invitation Expiration
+
+All invitations automatically expire after **7 days** from creation:
+
+```php
+// Invitation.php:36-39
+public function isExpired(): bool
+{
+    return $this->expires_at->isPast();
+}
+```
+
+Expired invitations cannot be accepted and are automatically filtered out from the pending invitations list.
+
+## Database Schema
+
+The invitations table structure:
+
+```sql
+-- 2025_12_16_165840_create_invitations_table.php
+CREATE TABLE invitations (
+    id BIGINT UNSIGNED PRIMARY KEY,
+    webhook_id BIGINT UNSIGNED,
+    inviter_id BIGINT UNSIGNED,
+    invitee_email VARCHAR(255),
+    permission_level ENUM('admin', 'editor', 'viewer') DEFAULT 'viewer',
+    token VARCHAR(255) UNIQUE,
+    status ENUM('pending', 'accepted', 'declined', 'cancelled') DEFAULT 'pending',
+    expires_at TIMESTAMP,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP,
+    
+    FOREIGN KEY (webhook_id) REFERENCES webhooks(id) ON DELETE CASCADE,
+    FOREIGN KEY (inviter_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX (webhook_id),
+    INDEX (invitee_email),
+    INDEX (status),
+    INDEX (token)
+);
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Appropriate Permissions" icon="shield-halved">
+    Always assign the minimum permission level necessary. Start with Viewer and upgrade if needed.
+  </Card>
+  
+  <Card title="Monitor Pending Invitations" icon="eye">
+    Regularly review and cancel unused pending invitations to maintain security.
+  </Card>
+  
+  <Card title="Verify Email Addresses" icon="envelope-circle-check">
+    Double-check email addresses before sending invitations to avoid sending to wrong users.
+  </Card>
+  
+  <Card title="Timely Response" icon="clock">
+    Respond to invitations promptly as they expire after 7 days.
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<Accordion title="Error: No user found with this email address">
+  The email address you entered is not registered in the system. Ask the user to create an account first before sending them an invitation.
+</Accordion>
+
+<Accordion title="Error: There is already a pending invitation">
+  A pending invitation already exists for this email address. Either wait for the user to respond, or cancel the existing invitation before sending a new one.
+</Accordion>
+
+<Accordion title="Error: This invitation has expired">
+  The invitation link is older than 7 days. Ask the webhook owner to send a new invitation.
+</Accordion>
+
+<Accordion title="Error: This invitation is not for you">
+  The invitation was sent to a different email address. Make sure you're logged in with the correct account that received the invitation.
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Permissions" icon="key" href="/collaboration/permissions">
+    Learn about the three permission levels: Admin, Editor, and Viewer
+  </Card>
+  
+  <Card title="Sharing" icon="share-nodes" href="/collaboration/sharing">
+    Understand how to share webhooks and templates with your team
+  </Card>
+</CardGroup>

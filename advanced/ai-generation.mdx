@@ -1,0 +1,251 @@
+---
+title: 'AI Content Generation'
+description: 'Generate Discord message content automatically using OpenAI GPT or Google Gemini'
+icon: 'sparkles'
+---
+
+## Overview
+
+Discord Webhook Manager includes AI-powered content generation to help you create engaging Discord messages quickly. The system supports two AI providers:
+
+- **OpenAI GPT-4** (gpt-4o model)
+- **Google Gemini** (gemini-2.5-flash model)
+
+<Note>
+AI generation is available in all message editors: Quick Send, Webhooks, and Templates.
+</Note>
+
+## Configuration
+
+### Enable AI Provider
+
+Administrators can configure AI providers through the Settings panel:
+
+<Steps>
+  <Step title="Access Admin Settings">
+    Navigate to the admin dashboard and select **Settings**
+  </Step>
+  
+  <Step title="Choose AI Provider">
+    Select either **OpenAI** or **Gemini** as your preferred provider
+  </Step>
+  
+  <Step title="Add API Key">
+    Enter your API key for the selected provider:
+    
+    <CodeGroup>
+    ```env OpenAI
+    OPENAI_API_KEY=sk-...
+    ```
+    
+    ```env Gemini
+    GEMINI_API_KEY=AI...
+    ```
+    </CodeGroup>
+  </Step>
+</Steps>
+
+### Provider Configuration
+
+Both providers are configured through the `AiService` class (`app/app/Services/AiService.php:18`):
+
+**OpenAI Configuration:**
+- Model: `gpt-4o`
+- Temperature: `0.7`
+- Max tokens: `1000`
+- Endpoint: `https://api.openai.com/v1/chat/completions`
+
+**Gemini Configuration:**
+- Model: `gemini-2.5-flash`
+- Temperature: `0.7`
+- Max output tokens: `1024`
+- Endpoint: `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent`
+
+## User Access Control
+
+### Granting AI Access
+
+Administrators control which users can access AI features through the user management panel:
+
+1. Navigate to **Admin Dashboard** → **Users**
+2. Toggle the **AI Access** switch for each user
+3. Set daily usage limits (default: 5 requests per day)
+
+<Warning>
+Administrators have unlimited AI usage and are exempt from daily limits.
+</Warning>
+
+### Usage Limits
+
+The system tracks AI usage per user through the `ai_usages` table (`app/app/Controllers/AiController.php:26-37`):
+
+- Non-admin users have a configurable daily limit (default: 5)
+- Usage resets daily at midnight
+- Administrators bypass all limits
+- Failed generations don't count toward the limit
+
+## Using AI Generation
+
+### In Message Editors
+
+The AI generation interface appears in all message composition screens:
+
+<Steps>
+  <Step title="Write Your Prompt">
+    Enter a description of the content you want to generate:
+    
+    ```text
+    Write a welcome message for new Discord members joining our gaming community
+    ```
+  </Step>
+  
+  <Step title="Generate Content">
+    Click the **Generate with AI** button (sparkle icon)
+  </Step>
+  
+  <Step title="Review and Edit">
+    The generated content appears in the message editor
+    
+    You can edit, refine, or regenerate as needed
+  </Step>
+</Steps>
+
+### Prompt Best Practices
+
+<Tip>
+Be specific in your prompts for better results:
+- **Good**: "Write an announcement about server maintenance on March 15th from 2-4 PM EST"
+- **Poor**: "Write something about maintenance"
+</Tip>
+
+The AI uses a specialized system prompt optimized for Discord content:
+
+```text
+Eres un experto en comunicación para Discord. Genera únicamente el 
+contenido del mensaje solicitado utilizando formato Markdown de Discord 
+(negritas, listas, emojis, etc.). No incluyas introducciones, 
+explicaciones, ni textos adicionales.
+```
+
+### Discord Markdown Support
+
+The AI automatically formats content using Discord markdown:
+
+- **Bold text**: `**text**`
+- *Italic text*: `*text*`
+- `Code blocks`: `` `code` ``
+- Lists: `- item`
+- Emojis: Native Unicode emojis
+
+## API Response Handling
+
+### Error Scenarios
+
+The AI controller handles various error cases (`app/app/Controllers/AiController.php:14-62`):
+
+**Permission Denied (403)**
+```json
+{
+  "success": false,
+  "message": "No tienes permiso para usar esta función."
+}
+```
+
+**Daily Limit Reached (429)**
+```json
+{
+  "success": false,
+  "message": "Has alcanzado el límite diario de uso de la IA (5). ¡Vuelve mañana!"
+}
+```
+
+**Generation Failed (422)**
+```json
+{
+  "success": false,
+  "message": "No se pudo generar el contenido. Esto puede deberse a una clave de API inválida, límites excedidos o un modelo no disponible."
+}
+```
+
+### Success Response
+
+```json
+{
+  "success": true,
+  "content": "🎮 Welcome to our gaming community!\n\nWe're excited to have you here..."
+}
+```
+
+## Usage Tracking
+
+Every successful AI generation is logged in the `ai_usages` table for analytics and quota management.
+
+**Database Schema:**
+```sql
+CREATE TABLE ai_usages (
+  id BIGINT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP
+);
+```
+
+Administrators can view usage statistics per user in the admin dashboard to:
+- Monitor AI adoption
+- Identify power users
+- Adjust daily limits as needed
+
+## Troubleshooting
+
+### API Key Issues
+
+If generation fails, check the logs (`storage/logs/laravel.log`):
+
+```text
+OpenAI API Key not found in settings
+Gemini API Key not found in settings
+```
+
+**Solution**: Verify the API key is set in Settings or `.env` file.
+
+### Rate Limiting
+
+Both providers have their own rate limits:
+
+- **OpenAI**: Depends on your account tier
+- **Gemini**: Free tier has daily quotas
+
+<Warning>
+If you exceed provider limits, users will receive a generation failed error. Consider upgrading your API plan or implementing request queuing.
+</Warning>
+
+### Model Availability
+
+If a model becomes unavailable:
+
+1. Check provider status pages
+2. Update the model name in `AiService.php`
+3. Test with the alternative provider
+
+## Security Considerations
+
+<Warning>
+**Never expose API keys in frontend code or commit them to version control.**
+</Warning>
+
+- API keys are stored in the `settings` table or `.env`
+- Keys are never sent to the client
+- All AI requests are server-side only
+- User prompts are not stored permanently
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Automation" icon="clock" href="/advanced/automation">
+    Schedule AI-generated messages for automatic delivery
+  </Card>
+  
+  <Card title="Templates" icon="file-code" href="/features/templates">
+    Save AI-generated content as reusable templates
+  </Card>
+</CardGroup>

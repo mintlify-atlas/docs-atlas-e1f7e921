@@ -1,0 +1,702 @@
+---
+title: 'Scheduled Messages API'
+description: 'Schedule one-time and recurring messages'
+icon: 'clock'
+---
+
+## Overview
+
+The Scheduled Messages API allows you to schedule messages to be sent at specific times or on a recurring schedule. Messages are processed by a background job queue.
+
+## List Scheduled Messages
+
+**GET** `/scheduled`
+
+Retrieve all scheduled messages for the authenticated user with pagination.
+
+### Query Parameters
+
+<ParamField query="status" type="string">
+  Filter by status: `pending`, `paused`, `completed`, or `all`
+</ParamField>
+
+<ParamField query="type" type="string">
+  Filter by schedule type: `once`, `recurring`, or `all`
+</ParamField>
+
+<ParamField query="page" type="integer" default="1">
+  Page number
+</ParamField>
+
+### Response
+
+<ResponseField name="messages" type="object">
+  Paginated scheduled messages
+  
+  <ResponseField name="data" type="array">
+    Array of scheduled message objects
+    
+    <ResponseField name="id" type="integer">
+      Scheduled message ID
+    </ResponseField>
+    
+    <ResponseField name="webhook_id" type="integer">
+      Associated webhook ID
+    </ResponseField>
+    
+    <ResponseField name="template_id" type="integer">
+      Associated template ID (nullable)
+    </ResponseField>
+    
+    <ResponseField name="message_content" type="object">
+      Message payload (same as send message)
+    </ResponseField>
+    
+    <ResponseField name="schedule_type" type="string">
+      Either `once` or `recurring`
+    </ResponseField>
+    
+    <ResponseField name="scheduled_at" type="string">
+      ISO timestamp for one-time messages
+    </ResponseField>
+    
+    <ResponseField name="recurrence_pattern" type="object">
+      Recurrence configuration for recurring messages
+    </ResponseField>
+    
+    <ResponseField name="timezone" type="string">
+      User's timezone (IANA format)
+    </ResponseField>
+    
+    <ResponseField name="next_send_at" type="string">
+      ISO timestamp of next scheduled send
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Status: `pending`, `paused`, `completed`
+    </ResponseField>
+    
+    <ResponseField name="send_count" type="integer">
+      Number of times message has been sent
+    </ResponseField>
+    
+    <ResponseField name="max_sends" type="integer">
+      Maximum sends before completing (nullable)
+    </ResponseField>
+  </ResponseField>
+  
+  <ResponseField name="current_page" type="integer">
+    Current page number
+  </ResponseField>
+  
+  <ResponseField name="per_page" type="integer">
+    Items per page (20)
+  </ResponseField>
+  
+  <ResponseField name="total" type="integer">
+    Total scheduled messages
+  </ResponseField>
+</ResponseField>
+
+<CodeGroup>
+```bash cURL
+curl -X GET "https://your-domain.com/scheduled?status=pending&type=recurring" \
+  -H "Accept: application/json" \
+  -H "X-CSRF-TOKEN: your-csrf-token" \
+  --cookie "session-cookie"
+```
+
+```javascript Fetch
+fetch('/scheduled?status=pending&type=recurring', {
+  method: 'GET',
+  headers: {
+    'Accept': 'application/json',
+    'X-CSRF-TOKEN': csrfToken
+  },
+  credentials: 'include'
+})
+```
+</CodeGroup>
+
+```json Response
+{
+  "messages": {
+    "data": [
+      {
+        "id": 1,
+        "user_id": 1,
+        "webhook_id": 5,
+        "template_id": 2,
+        "message_content": {
+          "content": "Daily report for {date}",
+          "embeds": [...]
+        },
+        "schedule_type": "recurring",
+        "scheduled_at": null,
+        "recurrence_pattern": {
+          "frequency": "daily",
+          "time": "09:00",
+          "days": null
+        },
+        "timezone": "America/New_York",
+        "next_send_at": "2024-01-16T14:00:00.000000Z",
+        "status": "pending",
+        "send_count": 15,
+        "max_sends": null,
+        "webhook": {
+          "id": 5,
+          "name": "Daily Reports"
+        },
+        "template": {
+          "id": 2,
+          "name": "Daily Report Template"
+        },
+        "created_at": "2024-01-01T10:00:00.000000Z",
+        "updated_at": "2024-01-15T14:00:00.000000Z"
+      }
+    ],
+    "current_page": 1,
+    "per_page": 20,
+    "total": 45
+  },
+  "filters": {
+    "status": "pending",
+    "type": "recurring"
+  }
+}
+```
+
+---
+
+## Create Scheduled Message
+
+**POST** `/scheduled`
+
+Schedule a new message for one-time or recurring delivery.
+
+### Request Body
+
+<ParamField body="webhook_id" type="integer" required>
+  Webhook ID to send message through
+</ParamField>
+
+<ParamField body="template_id" type="integer">
+  Optional template ID to use
+</ParamField>
+
+<ParamField body="message_content" type="object" required>
+  Message payload (same structure as send message)
+  
+  <ParamField body="message_content.content" type="string">
+    Plain text content (max 2000 characters)
+  </ParamField>
+  
+  <ParamField body="message_content.embeds" type="array">
+    Array of embed objects (max 10)
+  </ParamField>
+</ParamField>
+
+<ParamField body="schedule_type" type="string" required>
+  Either `once` or `recurring`
+</ParamField>
+
+<ParamField body="scheduled_at" type="string">
+  ISO 8601 timestamp (required if schedule_type is `once`)
+</ParamField>
+
+<ParamField body="recurrence_pattern" type="object">
+  Recurrence configuration (required if schedule_type is `recurring`)
+  
+  <ParamField body="recurrence_pattern.frequency" type="string" required>
+    Frequency: `daily`, `weekly`, `monthly`
+  </ParamField>
+  
+  <ParamField body="recurrence_pattern.time" type="string" required>
+    Time in HH:MM format (24-hour)
+  </ParamField>
+  
+  <ParamField body="recurrence_pattern.days" type="array">
+    Array of day numbers (0-6, Sunday=0) for weekly frequency
+  </ParamField>
+  
+  <ParamField body="recurrence_pattern.day_of_month" type="integer">
+    Day of month (1-31) for monthly frequency
+  </ParamField>
+</ParamField>
+
+<ParamField body="timezone" type="string" required>
+  User's timezone in IANA format (e.g., `America/New_York`, `Europe/London`)
+</ParamField>
+
+<ParamField body="max_sends" type="integer">
+  Maximum number of times to send (for recurring). Null = unlimited
+</ParamField>
+
+<ParamField body="files" type="array">
+  File attachments (multipart/form-data). Max 10 files, 10MB each
+</ParamField>
+
+<CodeGroup>
+```json One-Time Message
+{
+  "webhook_id": 5,
+  "template_id": 2,
+  "message_content": {
+    "content": "This message will be sent once at the scheduled time",
+    "embeds": [
+      {
+        "title": "Scheduled Announcement",
+        "description": "Important update coming at {datetime}",
+        "color": 3447003
+      }
+    ]
+  },
+  "schedule_type": "once",
+  "scheduled_at": "2024-01-20T15:00:00",
+  "timezone": "America/New_York"
+}
+```
+
+```json Daily Recurring
+{
+  "webhook_id": 5,
+  "message_content": {
+    "content": "Daily reminder at 9 AM",
+    "embeds": [
+      {
+        "title": "Daily Standup",
+        "description": "Time for daily standup meeting!",
+        "color": 15844367
+      }
+    ]
+  },
+  "schedule_type": "recurring",
+  "recurrence_pattern": {
+    "frequency": "daily",
+    "time": "09:00"
+  },
+  "timezone": "America/New_York",
+  "max_sends": 30
+}
+```
+
+```json Weekly Recurring
+{
+  "webhook_id": 5,
+  "message_content": {
+    "content": "Weekly report for {date}"
+  },
+  "schedule_type": "recurring",
+  "recurrence_pattern": {
+    "frequency": "weekly",
+    "time": "17:00",
+    "days": [1, 3, 5]
+  },
+  "timezone": "Europe/London"
+}
+```
+
+```json Monthly Recurring
+{
+  "webhook_id": 5,
+  "message_content": {
+    "content": "Monthly report",
+    "embeds": [
+      {
+        "title": "Monthly Summary",
+        "description": "Here's your monthly report",
+        "color": 10181046
+      }
+    ]
+  },
+  "schedule_type": "recurring",
+  "recurrence_pattern": {
+    "frequency": "monthly",
+    "time": "10:00",
+    "day_of_month": 1
+  },
+  "timezone": "America/Los_Angeles"
+}
+```
+</CodeGroup>
+
+### Response
+
+Returns `302` redirect to `/scheduled` with success message.
+
+---
+
+## Update Scheduled Message
+
+**PUT/PATCH** `/scheduled/{id}`
+
+Update a scheduled message. Only allowed if the message hasn't been sent yet (`send_count` is 0).
+
+### Path Parameters
+
+<ParamField path="id" type="integer" required>
+  Scheduled message ID
+</ParamField>
+
+### Request Body
+
+Same structure as [Create Scheduled Message](#create-scheduled-message).
+
+Additional fields:
+
+<ParamField body="remove_files" type="array">
+  Array of file IDs to remove
+</ParamField>
+
+<CodeGroup>
+```json Request
+{
+  "webhook_id": 5,
+  "message_content": {
+    "content": "Updated message content"
+  },
+  "schedule_type": "recurring",
+  "recurrence_pattern": {
+    "frequency": "daily",
+    "time": "10:00"
+  },
+  "timezone": "America/New_York",
+  "remove_files": [1, 2]
+}
+```
+</CodeGroup>
+
+### Response
+
+Returns `302` redirect to `/scheduled` with success message.
+
+<Warning>
+  Cannot edit messages that have already been sent (`send_count > 0`)
+</Warning>
+
+---
+
+## Delete Scheduled Message
+
+**DELETE** `/scheduled/{id}`
+
+Permanently delete a scheduled message and all associated files.
+
+### Path Parameters
+
+<ParamField path="id" type="integer" required>
+  Scheduled message ID
+</ParamField>
+
+<CodeGroup>
+```bash cURL
+curl -X DELETE https://your-domain.com/scheduled/1 \
+  -H "X-CSRF-TOKEN: your-csrf-token" \
+  --cookie "session-cookie"
+```
+
+```javascript Fetch
+fetch('/scheduled/1', {
+  method: 'DELETE',
+  headers: {
+    'X-CSRF-TOKEN': csrfToken
+  },
+  credentials: 'include'
+})
+```
+</CodeGroup>
+
+### Response
+
+Returns `302` redirect to `/scheduled` with success message.
+
+---
+
+## Pause Scheduled Message
+
+**POST** `/scheduled/{id}/pause`
+
+Pause a scheduled message to prevent it from being sent.
+
+### Path Parameters
+
+<ParamField path="id" type="integer" required>
+  Scheduled message ID
+</ParamField>
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://your-domain.com/scheduled/1/pause \
+  -H "X-CSRF-TOKEN: your-csrf-token" \
+  --cookie "session-cookie"
+```
+
+```javascript Fetch
+fetch('/scheduled/1/pause', {
+  method: 'POST',
+  headers: {
+    'X-CSRF-TOKEN': csrfToken
+  },
+  credentials: 'include'
+})
+```
+</CodeGroup>
+
+### Response
+
+Returns `302` redirect back with success message.
+
+Status changes from `pending` to `paused`.
+
+---
+
+## Resume Scheduled Message
+
+**POST** `/scheduled/{id}/resume`
+
+Resume a paused scheduled message.
+
+### Path Parameters
+
+<ParamField path="id" type="integer" required>
+  Scheduled message ID
+</ParamField>
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://your-domain.com/scheduled/1/resume \
+  -H "X-CSRF-TOKEN: your-csrf-token" \
+  --cookie "session-cookie"
+```
+
+```javascript Fetch
+fetch('/scheduled/1/resume', {
+  method: 'POST',
+  headers: {
+    'X-CSRF-TOKEN': csrfToken
+  },
+  credentials: 'include'
+})
+```
+</CodeGroup>
+
+### Response
+
+Returns `302` redirect back with success message.
+
+Status changes from `paused` to `pending` and `next_send_at` is recalculated.
+
+---
+
+## Recurrence Patterns
+
+### Daily Recurrence
+
+Sends every day at the specified time.
+
+```json
+{
+  "frequency": "daily",
+  "time": "09:00"
+}
+```
+
+### Weekly Recurrence
+
+Sends on specific days of the week.
+
+<ParamField name="days" type="array">
+  Array of integers (0-6) where 0 = Sunday, 1 = Monday, etc.
+</ParamField>
+
+```json
+{
+  "frequency": "weekly",
+  "time": "14:00",
+  "days": [1, 3, 5]
+}
+```
+
+Above example sends every Monday, Wednesday, and Friday at 2 PM.
+
+### Monthly Recurrence
+
+Sends on a specific day of each month.
+
+<ParamField name="day_of_month" type="integer">
+  Day of month (1-31). If day doesn't exist in a month, skips that month.
+</ParamField>
+
+```json
+{
+  "frequency": "monthly",
+  "time": "10:00",
+  "day_of_month": 15
+}
+```
+
+Above example sends on the 15th of each month at 10 AM.
+
+---
+
+## Timezone Support
+
+All scheduled messages respect the user's timezone. Times are stored in UTC but calculated based on the provided timezone.
+
+### Common Timezones
+
+- `America/New_York` - Eastern Time (US)
+- `America/Chicago` - Central Time (US)
+- `America/Denver` - Mountain Time (US)
+- `America/Los_Angeles` - Pacific Time (US)
+- `Europe/London` - GMT/BST
+- `Europe/Paris` - CET/CEST
+- `Asia/Tokyo` - Japan Standard Time
+- `Australia/Sydney` - AEST/AEDT
+- `UTC` - Coordinated Universal Time
+
+<Note>
+  Use IANA timezone database names. See [full list](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
+</Note>
+
+---
+
+## Status Lifecycle
+
+<Steps>
+  <Step title="Pending">
+    Message is scheduled and will be sent at the next scheduled time.
+  </Step>
+  
+  <Step title="Paused">
+    Message is temporarily disabled and won't be sent until resumed.
+  </Step>
+  
+  <Step title="Completed">
+    For one-time messages: Already sent.
+    For recurring: Reached `max_sends` limit.
+  </Step>
+</Steps>
+
+---
+
+## File Attachments
+
+Scheduled messages can include file attachments:
+
+- Files are stored locally in `storage/app/scheduled_messages/{id}/`
+- Maximum 10 files per message
+- Maximum 10MB per file
+- Supported formats: jpg, jpeg, png, gif, webp, mp4, mov, avi
+- Files are automatically deleted when message is deleted
+
+### File Upload
+
+```javascript
+const formData = new FormData();
+formData.append('webhook_id', '5');
+formData.append('schedule_type', 'once');
+formData.append('scheduled_at', '2024-01-20T15:00:00');
+formData.append('timezone', 'America/New_York');
+formData.append('message_content[content]', 'Message with file');
+formData.append('files[]', fileInput.files[0]);
+
+fetch('/scheduled', {
+  method: 'POST',
+  headers: {
+    'X-CSRF-TOKEN': csrfToken
+  },
+  credentials: 'include',
+  body: formData
+})
+```
+
+---
+
+## Background Processing
+
+Scheduled messages are processed by Laravel's queue system:
+
+1. A scheduled job runs every minute
+2. Checks for messages where `next_send_at <= now()` and `status = 'pending'`
+3. Sends the message via Discord webhook
+4. Updates `send_count` and calculates `next_send_at` for recurring messages
+5. Changes status to `completed` if:
+   - One-time message already sent
+   - Recurring message reached `max_sends`
+
+<Warning>
+  Ensure your Laravel queue worker is running for scheduled messages to be processed:
+  
+  ```bash
+  php artisan queue:work
+  ```
+</Warning>
+
+---
+
+## Authorization
+
+| Operation | Permission Required |
+|-----------|--------------------|
+| List | Owner (user_id matches) |
+| Create | Authenticated + webhook access |
+| View | Owner |
+| Update | Owner |
+| Delete | Owner |
+| Pause/Resume | Owner |
+
+<Note>
+  Users can only manage their own scheduled messages. There's no sharing functionality for scheduled messages.
+</Note>
+
+---
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Timezone Awareness">
+    Always specify the user's local timezone, not UTC. The system handles timezone conversion automatically.
+  </Accordion>
+  
+  <Accordion title="Use Templates">
+    For recurring messages, use templates to easily update message content without recreating the schedule.
+  </Accordion>
+  
+  <Accordion title="Set Max Sends">
+    For time-limited campaigns, set `max_sends` to prevent infinite recurring messages.
+  </Accordion>
+  
+  <Accordion title="Test First">
+    Create a one-time scheduled message in the near future to test before setting up recurring schedules.
+  </Accordion>
+  
+  <Accordion title="Monitor Send Count">
+    Check `send_count` regularly to ensure messages are being delivered as expected.
+  </Accordion>
+  
+  <Accordion title="Pause Instead of Delete">
+    Temporarily disable messages with pause instead of deleting, so you can resume later without recreating.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Error Handling
+
+### Common Errors
+
+- **Invalid webhook**: Webhook doesn't exist or user doesn't have access
+- **Invalid timezone**: Timezone string not recognized
+- **Past timestamp**: Scheduled time is in the past (one-time messages)
+- **Invalid recurrence**: Missing required fields for recurring messages
+- **Cannot edit sent message**: Trying to edit a message that already sent
+
+### Failed Sends
+
+If a scheduled message fails to send:
+
+1. Error is logged in application logs
+2. `next_send_at` is still updated for recurring messages
+3. Message remains in `pending` status
+4. Check webhook validity and Discord API status

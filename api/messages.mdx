@@ -1,0 +1,460 @@
+---
+title: 'Messages API'
+description: 'Send messages and manage message delivery to Discord'
+icon: 'message'
+---
+
+## Overview
+
+The Messages API allows you to send messages through webhooks to Discord. Messages can include plain text, rich embeds, and file attachments.
+
+## Send Message to Webhook
+
+**POST** `/webhooks/{webhook}/send`
+
+Send a message through a specific webhook to Discord.
+
+### Path Parameters
+
+<ParamField path="webhook" type="integer" required>
+  Webhook ID to send the message through
+</ParamField>
+
+### Request Body
+
+<ParamField body="content" type="string">
+  Plain text message content (max 2000 characters). Supports variables like `{user.name}`, `{date}`, `{time}`
+</ParamField>
+
+<ParamField body="embeds" type="array">
+  Array of embed objects (max 10 embeds per message)
+  
+  <ParamField body="embeds[].title" type="string">
+    Embed title (max 256 characters)
+  </ParamField>
+  
+  <ParamField body="embeds[].description" type="string">
+    Embed description (max 4096 characters)
+  </ParamField>
+  
+  <ParamField body="embeds[].color" type="integer">
+    Embed color as decimal integer (e.g., 3447003 for blue)
+  </ParamField>
+  
+  <ParamField body="embeds[].url" type="string">
+    URL for the embed title
+  </ParamField>
+  
+  <ParamField body="embeds[].timestamp" type="string">
+    ISO 8601 timestamp
+  </ParamField>
+  
+  <ParamField body="embeds[].footer" type="object">
+    Footer object
+    
+    <ParamField body="text" type="string">
+      Footer text (max 2048 characters)
+    </ParamField>
+    
+    <ParamField body="icon_url" type="string">
+      Footer icon URL
+    </ParamField>
+  </ParamField>
+  
+  <ParamField body="embeds[].image" type="object">
+    Image object
+    
+    <ParamField body="url" type="string">
+      Image URL
+    </ParamField>
+  </ParamField>
+  
+  <ParamField body="embeds[].thumbnail" type="object">
+    Thumbnail object
+    
+    <ParamField body="url" type="string">
+      Thumbnail URL
+    </ParamField>
+  </ParamField>
+  
+  <ParamField body="embeds[].author" type="object">
+    Author object
+    
+    <ParamField body="name" type="string">
+      Author name (max 256 characters)
+    </ParamField>
+    
+    <ParamField body="url" type="string">
+      Author URL
+    </ParamField>
+    
+    <ParamField body="icon_url" type="string">
+      Author icon URL
+    </ParamField>
+  </ParamField>
+  
+  <ParamField body="embeds[].fields" type="array">
+    Array of field objects (max 25 fields)
+    
+    <ParamField body="name" type="string" required>
+      Field name (max 256 characters)
+    </ParamField>
+    
+    <ParamField body="value" type="string" required>
+      Field value (max 1024 characters)
+    </ParamField>
+    
+    <ParamField body="inline" type="boolean">
+      Whether field should display inline
+    </ParamField>
+  </ParamField>
+</ParamField>
+
+<ParamField body="files" type="array">
+  Array of file uploads (max 10 files, 10MB each). Multipart/form-data only. Supported: jpg, jpeg, png, gif, webp, mp4, mov, avi
+</ParamField>
+
+<CodeGroup>
+```json Simple Message
+{
+  "content": "Hello from {user.name}! The current time is {time}."
+}
+```
+
+```json Rich Embed
+{
+  "content": "Check out this embed!",
+  "embeds": [
+    {
+      "title": "Server Status",
+      "description": "All systems operational",
+      "color": 3066993,
+      "timestamp": "2024-01-15T10:30:00.000Z",
+      "footer": {
+        "text": "Status Bot",
+        "icon_url": "https://example.com/icon.png"
+      },
+      "author": {
+        "name": "System Monitor",
+        "icon_url": "https://example.com/monitor.png"
+      },
+      "fields": [
+        {
+          "name": "CPU Usage",
+          "value": "45%",
+          "inline": true
+        },
+        {
+          "name": "Memory",
+          "value": "2.4GB",
+          "inline": true
+        },
+        {
+          "name": "Uptime",
+          "value": "15 days",
+          "inline": true
+        }
+      ],
+      "thumbnail": {
+        "url": "https://example.com/thumbnail.png"
+      },
+      "image": {
+        "url": "https://example.com/graph.png"
+      }
+    }
+  ]
+}
+```
+
+```javascript Fetch with Files
+const formData = new FormData();
+formData.append('content', 'Message with attachment');
+formData.append('files[]', fileInput.files[0]);
+
+fetch('/webhooks/1/send', {
+  method: 'POST',
+  headers: {
+    'X-CSRF-TOKEN': csrfToken
+  },
+  credentials: 'include',
+  body: formData
+})
+```
+
+```bash cURL with File
+curl -X POST https://your-domain.com/webhooks/1/send \
+  -H "X-CSRF-TOKEN: your-csrf-token" \
+  --cookie "session-cookie" \
+  -F "content=Hello Discord!" \
+  -F "files[]=@/path/to/image.png"
+```
+</CodeGroup>
+
+### Response
+
+Returns `302` redirect to `/dashboard` with success or error message.
+
+### Success
+
+```
+Redirect to /dashboard
+Flash message: "✅ Message sent successfully to Discord!"
+```
+
+### Error
+
+```
+Redirect back with error
+Flash message: "❌ Failed to send message: [error details]"
+```
+
+---
+
+## Send Temporary Message
+
+**POST** `/send/temporary`
+
+Send a message using a temporary webhook URL without saving it to your account.
+
+### Request Body
+
+<ParamField body="temporary_webhook_url" type="string" required>
+  Discord webhook URL to send message to
+</ParamField>
+
+<ParamField body="temporary_name" type="string">
+  Custom webhook name for this message (max 80 characters)
+</ParamField>
+
+<ParamField body="temporary_avatar" type="string">
+  Custom avatar URL for this message
+</ParamField>
+
+<ParamField body="content" type="string">
+  Message content (max 2000 characters)
+</ParamField>
+
+<ParamField body="embeds" type="array">
+  Array of embed objects (same structure as regular send)
+</ParamField>
+
+<ParamField body="files" type="array">
+  File attachments
+</ParamField>
+
+<CodeGroup>
+```json Request
+{
+  "temporary_webhook_url": "https://discord.com/api/webhooks/123456789/abcdefg",
+  "temporary_name": "Custom Bot Name",
+  "temporary_avatar": "https://example.com/avatar.png",
+  "content": "Quick message without saving webhook!",
+  "embeds": [
+    {
+      "title": "Temporary Alert",
+      "description": "This is a one-time message",
+      "color": 15158332
+    }
+  ]
+}
+```
+
+```javascript Fetch
+fetch('/send/temporary', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-CSRF-TOKEN': csrfToken
+  },
+  credentials: 'include',
+  body: JSON.stringify({
+    temporary_webhook_url: 'https://discord.com/api/webhooks/123/abc',
+    temporary_name: 'Quick Bot',
+    content: 'Hello Discord!'
+  })
+})
+```
+</CodeGroup>
+
+### Response
+
+Returns `302` redirect to `/dashboard` with success or error message.
+
+---
+
+## Quick Send Page
+
+**GET** `/send`
+
+Display the quick send interface with available webhooks and templates.
+
+### Response
+
+Returns Inertia page with:
+
+<ResponseField name="webhooks" type="array">
+  All webhooks available to the user (owned + shared)
+</ResponseField>
+
+<ResponseField name="templates" type="array">
+  All templates available to the user (owned + shared)
+</ResponseField>
+
+---
+
+## Variable Replacement
+
+Messages support dynamic variables that are automatically replaced when sent:
+
+### User Variables
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `{user.name}` | Current user's name | John Doe |
+| `{user.email}` | Current user's email | john@example.com |
+| `{user.id}` | User ID | 123 |
+
+### Webhook Variables
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `{webhook.name}` | Webhook name | Production Alerts |
+| `{webhook.id}` | Webhook ID | 456 |
+
+### Date/Time Variables
+
+| Variable | Description | Example |
+|----------|-------------|----------|
+| `{date}` | Current date | 2024-01-15 |
+| `{time}` | Current time | 10:30:45 |
+| `{datetime}` | Current date and time | 2024-01-15 10:30:45 |
+
+### Example with Variables
+
+```json
+{
+  "content": "Alert from {user.name} at {time}",
+  "embeds": [
+    {
+      "title": "Status Update",
+      "description": "Webhook: {webhook.name}\nDate: {date}",
+      "footer": {
+        "text": "Sent by {user.email}"
+      }
+    }
+  ]
+}
+```
+
+Becomes:
+
+```json
+{
+  "content": "Alert from John Doe at 10:30:45",
+  "embeds": [
+    {
+      "title": "Status Update",
+      "description": "Webhook: Production Alerts\nDate: 2024-01-15",
+      "footer": {
+        "text": "Sent by john@example.com"
+      }
+    }
+  ]
+}
+```
+
+---
+
+## Discord Embed Colors
+
+Common color values for embeds (decimal format):
+
+| Color | Decimal | Hex |
+|-------|---------|-----|
+| Default | 0 | #000000 |
+| Aqua | 1752220 | #1ABC9C |
+| Green | 3066993 | #2ECC71 |
+| Blue | 3447003 | #3498DB |
+| Purple | 10181046 | #9B59B6 |
+| Gold | 15844367 | #F1C40F |
+| Orange | 15105570 | #E67E22 |
+| Red | 15158332 | #E74C3C |
+| Grey | 9807270 | #95A5A6 |
+| Dark Grey | 9936031 | #979C9F |
+| Navy | 3426654 | #34495E |
+
+---
+
+## File Upload Limits
+
+<Note>
+  **Important**: File uploads must use `multipart/form-data` encoding, not JSON.
+</Note>
+
+- **Max files per message**: 10
+- **Max file size**: 10 MB per file
+- **Supported formats**: jpg, jpeg, png, gif, webp, mp4, mov, avi
+- **Field name**: `files[]` (array notation)
+
+---
+
+## Message History
+
+All sent messages are logged in the message history with:
+
+- User who sent the message
+- Message content (stored as JSON)
+- Send timestamp
+- Status (success/failed)
+- Discord API response
+
+View history using the [Get Message History](/api/webhooks#get-message-history) endpoint.
+
+---
+
+## Error Handling
+
+### Validation Errors
+
+```json
+{
+  "errors": {
+    "content": ["The content must not be greater than 2000 characters."]
+  }
+}
+```
+
+### Discord API Errors
+
+Common Discord errors:
+
+- `Unknown Webhook`: Webhook URL is invalid or deleted
+- `Invalid Form Body`: Message content violates Discord limits
+- `Cannot send an empty message`: Both content and embeds are empty
+- `Rate Limited`: Too many messages sent too quickly
+
+---
+
+## Best Practices
+
+<Warning>
+  Always validate message content before sending. Discord has strict character limits that will cause message delivery to fail if exceeded.
+</Warning>
+
+<AccordionGroup>
+  <Accordion title="Use Templates">
+    Create templates for frequently sent messages to ensure consistency and reduce errors.
+  </Accordion>
+  
+  <Accordion title="Test Before Production">
+    Use a test Discord server to verify message formatting before sending to production channels.
+  </Accordion>
+  
+  <Accordion title="Monitor Message History">
+    Check message history regularly to identify and troubleshoot failed deliveries.
+  </Accordion>
+  
+  <Accordion title="Respect Rate Limits">
+    Discord rate limits webhook requests. Avoid sending messages too rapidly.
+  </Accordion>
+</AccordionGroup>

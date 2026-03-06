@@ -1,0 +1,283 @@
+---
+title: 'User Management'
+description: 'Manage users, permissions, and AI access for your platform'
+icon: 'users-gear'
+---
+
+The User Management system allows administrators to control user accounts, manage AI permissions, and maintain platform security.
+
+## User Roles
+
+The platform supports two user roles:
+
+<CardGroup cols={2}>
+  <Card title="Admin" icon="shield-halved">
+    Full platform access including:
+    - User management
+    - Platform settings
+    - All scheduled messages
+    - Unlimited AI usage
+    - Cannot be deleted by other admins
+  </Card>
+  
+  <Card title="User" icon="user">
+    Standard user with access to:
+    - Personal webhooks
+    - Templates and scheduled messages
+    - Collaboration features
+    - Optional AI access (if enabled)
+  </Card>
+</CardGroup>
+
+## Viewing Users
+
+The admin dashboard displays the 10 most recent users with the following information:
+
+- **Name**: User's display name
+- **Email**: User's email address
+- **Role**: `admin` or `user`
+- **AI Access**: Whether the user can use AI features
+- **Registration Date**: When the user joined
+
+```php
+// From web.php:114
+$recentUsers = \App\Models\User::latest()->limit(10)->get();
+```
+
+## Managing AI Permissions
+
+<Note>
+  AI permissions control whether users can access the AI content generation features available in the message editor.
+</Note>
+
+### Toggling AI Access
+
+Administrators can enable or disable AI access for individual users:
+
+<Steps>
+  <Step title="Navigate to User List">
+    Access the admin dashboard at `/admin`
+  </Step>
+  
+  <Step title="Find Target User">
+    Locate the user in the recent users list
+  </Step>
+  
+  <Step title="Toggle AI Access">
+    Click the toggle button to enable/disable AI access
+  </Step>
+</Steps>
+
+### API Endpoint
+
+The toggle action uses the following route:
+
+```php
+// From web.php:177
+Route::post('admin/users/{user}/toggle-ai', 
+    [\App\Http\Controllers\AiController::class, 'toggleAccess']
+)->name('admin.users.toggle-ai');
+```
+
+### Implementation Details
+
+The `toggleAccess` method in `AiController.php:67-82`:
+
+```php
+public function toggleAccess(\App\Models\User $user)
+{
+    if (!auth()->user()->isAdmin()) {
+        abort(403);
+    }
+
+    if ($user->isAdmin()) {
+        return redirect()->back()->with('error', 
+            'No se puede cambiar el acceso de un administrador.');
+    }
+
+    $user->update([
+        'can_use_ai' => !$user->can_use_ai
+    ]);
+
+    return redirect()->back()->with('success', 
+        'Acceso a IA actualizado para el usuario.');
+}
+```
+
+<Warning>
+  **Admin Protection**: You cannot modify AI access for other admin users. Admins always have unlimited AI access.
+</Warning>
+
+## AI Usage Limits
+
+For users with AI access enabled, you can configure daily usage limits:
+
+- **Daily Limit**: Set in platform settings (default: 5 requests per day)
+- **Usage Tracking**: Stored in the `ai_usages` table
+- **Admin Exemption**: Admins have unlimited AI usage
+
+### How Limits Work
+
+From `AiController.php:26-38`:
+
+```php
+if (!$user->isAdmin()) {
+    $dailyLimit = \App\Models\Setting::get('ai_daily_limit', 5);
+    $usageCount = \App\Models\AiUsage::where('user_id', $user->id)
+        ->whereDate('created_at', now()->today())
+        ->count();
+
+    if ($usageCount >= $dailyLimit) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Has alcanzado el límite diario de uso de la IA'
+        ], 429);
+    }
+}
+```
+
+<Note>
+  Usage limits reset daily at midnight UTC. You can adjust the daily limit in [Platform Settings](/admin/settings).
+</Note>
+
+## Deleting Users
+
+Administrators can delete user accounts with the following restrictions:
+
+<Warning>
+  **Deletion Restrictions**:
+  - You cannot delete your own account
+  - You cannot delete other admin accounts
+  - User deletion is permanent and cascades to related data
+</Warning>
+
+### Deletion Process
+
+<Steps>
+  <Step title="Identify User">
+    Select the user account to delete from the dashboard
+  </Step>
+  
+  <Step title="Confirm Action">
+    Confirm the deletion action (this is irreversible)
+  </Step>
+  
+  <Step title="Cascade Delete">
+    User and all related data (webhooks, templates, messages) are removed
+  </Step>
+</Steps>
+
+### Deletion Endpoint
+
+From `web.php:163-175`:
+
+```php
+Route::delete('admin/users/{user}', function (\App\Models\User $user) {
+    if ($user->id === auth()->id()) {
+        return redirect()->back()->with('error', 
+            'You cannot delete your own account.');
+    }
+
+    if ($user->role === 'admin') {
+        return redirect()->back()->with('error', 
+            'You cannot delete another admin account.');
+    }
+
+    $user->delete();
+
+    return redirect()->back()->with('success', 
+        'User deleted successfully.');
+})->name('admin.users.destroy');
+```
+
+## User Database Structure
+
+Users are stored with the following key attributes from `User.php:22-28`:
+
+```php
+protected $fillable = [
+    'name',
+    'email',
+    'password',
+    'role',           // 'admin' or 'user'
+    'can_use_ai',     // boolean
+];
+```
+
+### User Relationships
+
+Each user has the following relationships:
+
+- **webhooks**: Webhooks owned by the user
+- **collaboratedWebhooks**: Webhooks shared with the user
+- **templates**: Templates created by the user
+- **sharedTemplates**: Templates shared with the user
+- **scheduledMessages**: Scheduled messages created by the user
+- **sentMessages**: Message history
+
+## Permission Levels
+
+When users collaborate on resources, they can have different permission levels:
+
+<CardGroup cols={3}>
+  <Card title="Admin" icon="crown">
+    - Full management access
+    - Can invite others
+    - Can modify permissions
+    - Can delete resource
+  </Card>
+  
+  <Card title="Editor" icon="pen-to-square">
+    - Can edit resource
+    - Can send messages
+    - Cannot manage collaborators
+    - Cannot delete resource
+  </Card>
+  
+  <Card title="Viewer" icon="eye">
+    - Read-only access
+    - View history
+    - Cannot edit or send
+    - Cannot manage collaborators
+  </Card>
+</CardGroup>
+
+<Note>
+  Resource permission levels are separate from user roles. A standard user can have admin permissions on specific webhooks or templates they own.
+</Note>
+
+## Best Practices
+
+<Steps>
+  <Step title="Regular Audits">
+    Periodically review user accounts and AI access permissions
+  </Step>
+  
+  <Step title="AI Limits">
+    Set appropriate daily AI limits based on your API costs and user needs
+  </Step>
+  
+  <Step title="Admin Accounts">
+    Keep the number of admin accounts to a minimum for security
+  </Step>
+  
+  <Step title="User Monitoring">
+    Monitor user activity through scheduled messages and webhook usage
+  </Step>
+</Steps>
+
+## Related Documentation
+
+<CardGroup cols={3}>
+  <Card title="Dashboard" icon="gauge-high" href="/admin/dashboard">
+    Return to admin dashboard overview
+  </Card>
+  
+  <Card title="AI Settings" icon="wand-magic-sparkles" href="/admin/settings">
+    Configure AI providers and limits
+  </Card>
+  
+  <Card title="Scheduled Messages" icon="clock" href="/admin/scheduled-messages">
+    View user activity and scheduled messages
+  </Card>
+</CardGroup>

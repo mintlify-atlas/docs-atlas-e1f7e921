@@ -1,0 +1,907 @@
+---
+title: "Installation Guide"
+description: "Complete guide to self-hosting Discord Webhook Manager on Ubuntu Server with PostgreSQL, Redis, and production-ready configuration."
+---
+
+## Overview
+
+This guide provides step-by-step instructions for deploying Discord Webhook Manager on your own infrastructure. The application is designed to run on Ubuntu Server with PostgreSQL, Redis, and Nginx.
+
+<Warning>
+  This guide is for self-hosting the application. If you're looking to use a hosted instance, skip to the [Quick Start](/quickstart) guide instead.
+</Warning>
+
+## System Requirements
+
+### Hardware Requirements
+
+**Minimum:**
+- 1 CPU core
+- 2 GB RAM
+- 20 GB storage
+- Stable internet connection
+
+**Recommended:**
+- 2+ CPU cores
+- 4 GB RAM
+- 50 GB SSD storage
+- 100+ Mbps network connection
+
+### Software Requirements
+
+This guide assumes you have a clean **Ubuntu 22.04 LTS** or **Ubuntu 24.04 LTS** server.
+
+<Info>
+  While other Linux distributions may work, this guide is specifically written for Ubuntu Server and uses Ubuntu-specific package management.
+</Info>
+
+## Prerequisites Installation
+
+Install all required system dependencies:
+
+<Steps>
+  <Step title="Update System Packages">
+    ```bash
+    sudo apt update
+    sudo apt upgrade -y
+    ```
+  </Step>
+  
+  <Step title="Install Base Dependencies">
+    ```bash
+    sudo apt install -y git curl unzip software-properties-common
+    ```
+  </Step>
+  
+  <Step title="Install PHP 8.4">
+    Add the PHP repository and install PHP with required extensions:
+    
+    ```bash
+    sudo add-apt-repository ppa:ondrej/php -y
+    sudo apt update
+    sudo apt install -y php8.4 php8.4-fpm php8.4-cli php8.4-common \
+      php8.4-bcmath php8.4-ctype php8.4-fileinfo php8.4-json \
+      php8.4-mbstring php8.4-openssl php8.4-pdo php8.4-pgsql \
+      php8.4-tokenizer php8.4-xml php8.4-curl php8.4-zip \
+      php8.4-redis php8.4-gd php8.4-intl
+    ```
+    
+    Verify installation:
+    ```bash
+    php -v
+    # Should show PHP 8.4.x
+    ```
+  </Step>
+  
+  <Step title="Install Composer">
+    Install Composer (PHP package manager):
+    
+    ```bash
+    curl -sS https://getcomposer.org/installer | php
+    sudo mv composer.phar /usr/local/bin/composer
+    sudo chmod +x /usr/local/bin/composer
+    ```
+    
+    Verify installation:
+    ```bash
+    composer --version
+    ```
+  </Step>
+  
+  <Step title="Install Node.js 20+">
+    Install Node.js and NPM:
+    
+    ```bash
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    sudo apt install -y nodejs
+    ```
+    
+    Verify installation:
+    ```bash
+    node -v   # Should show v20.x.x or higher
+    npm -v
+    ```
+  </Step>
+  
+  <Step title="Install PostgreSQL">
+    Install PostgreSQL database server:
+    
+    ```bash
+    sudo apt install -y postgresql postgresql-contrib
+    sudo systemctl enable postgresql
+    sudo systemctl start postgresql
+    ```
+    
+    Create database and user:
+    
+    ```bash
+    sudo -u postgres psql
+    ```
+    
+    Then in the PostgreSQL prompt:
+    
+    ```sql
+    CREATE DATABASE discord_webhook;
+    CREATE USER webhook_user WITH ENCRYPTED PASSWORD 'your_secure_password';
+    GRANT ALL PRIVILEGES ON DATABASE discord_webhook TO webhook_user;
+    \q
+    ```
+    
+    <Warning>
+      Replace `your_secure_password` with a strong, unique password. Never use default credentials in production.
+    </Warning>
+  </Step>
+  
+  <Step title="Install Redis">
+    Install Redis for caching, sessions, and queue management:
+    
+    ```bash
+    sudo apt install -y redis-server
+    sudo systemctl enable redis-server
+    sudo systemctl start redis-server
+    ```
+    
+    Verify Redis is running:
+    ```bash
+    redis-cli ping
+    # Should respond with PONG
+    ```
+  </Step>
+  
+  <Step title="Install Nginx">
+    Install Nginx web server:
+    
+    ```bash
+    sudo apt install -y nginx
+    sudo systemctl enable nginx
+    sudo systemctl start nginx
+    ```
+  </Step>
+  
+  <Step title="Install Supervisor">
+    Install Supervisor for managing queue workers:
+    
+    ```bash
+    sudo apt install -y supervisor
+    sudo systemctl enable supervisor
+    sudo systemctl start supervisor
+    ```
+  </Step>
+</Steps>
+
+## Application Deployment
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the project to your web server directory:
+    
+    ```bash
+    cd /var/www
+    sudo git clone https://github.com/edgarqs/DiscordWebhook.git discord-webhook-manager
+    cd discord-webhook-manager/app
+    ```
+    
+    <Info>
+      The application code is in the `/app` subdirectory of the repository.
+    </Info>
+  </Step>
+  
+  <Step title="Install PHP Dependencies">
+    Install Laravel dependencies using Composer:
+    
+    ```bash
+    composer install --optimize-autoloader --no-dev
+    ```
+    
+    <Note>
+      The `--no-dev` flag excludes development dependencies for a production build.
+    </Note>
+  </Step>
+  
+  <Step title="Install JavaScript Dependencies">
+    Install and build frontend assets:
+    
+    ```bash
+    npm install
+    npm run build
+    ```
+    
+    This will compile the React + TypeScript frontend into production-optimized assets.
+  </Step>
+  
+  <Step title="Configure Environment File">
+    Create the environment configuration:
+    
+    ```bash
+    cp .env.example .env
+    ```
+    
+    Edit the `.env` file with your configuration:
+    
+    ```bash
+    nano .env
+    ```
+    
+    <CodeGroup>
+    ```ini Basic Configuration
+    APP_NAME=WebhookManager
+    APP_ENV=production
+    APP_DEBUG=false
+    APP_URL=https://yourdomain.com
+    
+    APP_LOCALE=en
+    APP_FALLBACK_LOCALE=en
+    ```
+    
+    ```ini Database Configuration
+    DB_CONNECTION=pgsql
+    DB_HOST=127.0.0.1
+    DB_PORT=5432
+    DB_DATABASE=discord_webhook
+    DB_USERNAME=webhook_user
+    DB_PASSWORD=your_secure_password
+    ```
+    
+    ```ini Redis Configuration
+    REDIS_CLIENT=phpredis
+    REDIS_HOST=127.0.0.1
+    REDIS_PASSWORD=null
+    REDIS_PORT=6379
+    
+    CACHE_STORE=redis
+    SESSION_DRIVER=redis
+    SESSION_STORE=redis
+    QUEUE_CONNECTION=redis
+    ```
+    
+    ```ini Mail Configuration
+    MAIL_MAILER=smtp
+    MAIL_HOST=smtp.yourmailserver.com
+    MAIL_PORT=587
+    MAIL_USERNAME=your_smtp_username
+    MAIL_PASSWORD=your_smtp_password
+    MAIL_ENCRYPTION=tls
+    MAIL_FROM_ADDRESS="noreply@yourdomain.com"
+    MAIL_FROM_NAME="${APP_NAME}"
+    ```
+    
+    ```ini Optional: AI Configuration
+    # Uncomment and configure if you want AI features
+    # OPENAI_API_KEY=sk-...
+    # GEMINI_API_KEY=...
+    ```
+    </CodeGroup>
+    
+    <Warning>
+      **Critical Security Settings:**
+      - Set `APP_DEBUG=false` in production
+      - Use strong, unique passwords for database
+      - Configure proper SMTP settings for email delivery
+      - Never commit `.env` file to version control
+    </Warning>
+  </Step>
+  
+  <Step title="Generate Application Key">
+    Generate a unique application encryption key:
+    
+    ```bash
+    php artisan key:generate
+    ```
+    
+    This will automatically update the `APP_KEY` in your `.env` file.
+  </Step>
+  
+  <Step title="Set File Permissions">
+    Configure proper file permissions for Laravel:
+    
+    ```bash
+    sudo chown -R www-data:www-data /var/www/discord-webhook-manager
+    sudo chmod -R 755 /var/www/discord-webhook-manager
+    sudo chmod -R 775 /var/www/discord-webhook-manager/app/storage
+    sudo chmod -R 775 /var/www/discord-webhook-manager/app/bootstrap/cache
+    ```
+  </Step>
+  
+  <Step title="Run Database Migrations">
+    Create all required database tables:
+    
+    ```bash
+    php artisan migrate --force
+    ```
+    
+    The `--force` flag is required to run migrations in production.
+  </Step>
+</Steps>
+
+## Web Server Configuration
+
+<Steps>
+  <Step title="Create Nginx Configuration">
+    Create a new Nginx site configuration:
+    
+    ```bash
+    sudo nano /etc/nginx/sites-available/discord-webhook-manager
+    ```
+    
+    Add the following configuration:
+    
+    ```nginx
+    server {
+        listen 80;
+        listen [::]:80;
+        server_name yourdomain.com www.yourdomain.com;
+        root /var/www/discord-webhook-manager/app/public;
+    
+        add_header X-Frame-Options "SAMEORIGIN";
+        add_header X-Content-Type-Options "nosniff";
+        add_header X-XSS-Protection "1; mode=block";
+    
+        index index.php index.html;
+    
+        charset utf-8;
+    
+        location / {
+            try_files $uri $uri/ /index.php?$query_string;
+        }
+    
+        location = /favicon.ico { access_log off; log_not_found off; }
+        location = /robots.txt  { access_log off; log_not_found off; }
+    
+        error_page 404 /index.php;
+    
+        location ~ \.php$ {
+            fastcgi_pass unix:/var/run/php/php8.4-fpm.sock;
+            fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+            include fastcgi_params;
+            fastcgi_hide_header X-Powered-By;
+        }
+    
+        location ~ /\.(?!well-known).* {
+            deny all;
+        }
+        
+        # Increase upload size for file attachments
+        client_max_body_size 10M;
+    }
+    ```
+    
+    <Warning>
+      Replace `yourdomain.com` with your actual domain name.
+    </Warning>
+  </Step>
+  
+  <Step title="Enable the Site">
+    Enable the site and test the configuration:
+    
+    ```bash
+    sudo ln -s /etc/nginx/sites-available/discord-webhook-manager /etc/nginx/sites-enabled/
+    sudo nginx -t
+    ```
+    
+    If the test passes, reload Nginx:
+    
+    ```bash
+    sudo systemctl reload nginx
+    ```
+  </Step>
+  
+  <Step title="Configure SSL with Certbot (Recommended)">
+    Install Certbot for free SSL certificates:
+    
+    ```bash
+    sudo apt install -y certbot python3-certbot-nginx
+    ```
+    
+    Obtain and install SSL certificate:
+    
+    ```bash
+    sudo certbot --nginx -d yourdomain.com -d www.yourdomain.com
+    ```
+    
+    Follow the prompts to complete SSL setup. Certbot will automatically:
+    - Obtain a certificate from Let's Encrypt
+    - Configure Nginx to use HTTPS
+    - Set up automatic certificate renewal
+    
+    <Info>
+      After SSL setup, update your `.env` file to use `https://` in the `APP_URL`.
+    </Info>
+  </Step>
+</Steps>
+
+## Queue Worker Configuration (Critical)
+
+<Warning>
+  **The queue worker is essential for scheduled messages to function.** Without it, scheduled messages will not be sent.
+</Warning>
+
+<Steps>
+  <Step title="Create Supervisor Configuration">
+    Create a Supervisor configuration file for the queue worker:
+    
+    ```bash
+    sudo nano /etc/supervisor/conf.d/discord-worker.conf
+    ```
+    
+    Add the following configuration:
+    
+    ```ini
+    [program:discord-worker]
+    process_name=%(program_name)s_%(process_num)02d
+    command=php /var/www/discord-webhook-manager/app/artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
+    autostart=true
+    autorestart=true
+    stopasgroup=true
+    killasgroup=true
+    user=www-data
+    numprocs=2
+    redirect_stderr=true
+    stdout_logfile=/var/www/discord-webhook-manager/app/storage/logs/worker.log
+    stdout_logfile_maxbytes=10MB
+    stdout_logfile_backups=3
+    stopwaitsecs=3600
+    ```
+    
+    <Info>
+      This configuration runs 2 worker processes. Adjust `numprocs` based on your server's resources and workload.
+    </Info>
+  </Step>
+  
+  <Step title="Start the Queue Worker">
+    Load the new configuration and start the worker:
+    
+    ```bash
+    sudo supervisorctl reread
+    sudo supervisorctl update
+    sudo supervisorctl start discord-worker:*
+    ```
+    
+    Check worker status:
+    ```bash
+    sudo supervisorctl status discord-worker:*
+    ```
+    
+    You should see output indicating the workers are running.
+  </Step>
+  
+  <Step title="Monitor Worker Logs">
+    View worker logs to ensure everything is working:
+    
+    ```bash
+    tail -f /var/www/discord-webhook-manager/app/storage/logs/worker.log
+    ```
+  </Step>
+</Steps>
+
+## Task Scheduler Configuration (Critical)
+
+<Warning>
+  **The Laravel scheduler is essential for triggering scheduled messages.** It must run every minute for scheduled messages to work correctly.
+</Warning>
+
+<Steps>
+  <Step title="Configure Cron Job">
+    Edit the crontab for the `www-data` user:
+    
+    ```bash
+    sudo crontab -e -u www-data
+    ```
+    
+    Add the following line at the end of the file:
+    
+    ```bash
+    * * * * * cd /var/www/discord-webhook-manager/app && php artisan schedule:run >> /dev/null 2>&1
+    ```
+    
+    Save and exit the editor.
+  </Step>
+  
+  <Step title="Verify Cron is Running">
+    Check that cron service is active:
+    
+    ```bash
+    sudo systemctl status cron
+    ```
+    
+    View scheduled tasks:
+    ```bash
+    sudo crontab -l -u www-data
+    ```
+  </Step>
+</Steps>
+
+## Post-Installation Steps
+
+<Steps>
+  <Step title="Create Admin Account">
+    Access your application in a web browser at your domain (e.g., `https://yourdomain.com`). Register for an account through the registration form.
+    
+    After registering, you need to manually promote your account to admin:
+    
+    ```bash
+    cd /var/www/discord-webhook-manager/app
+    php artisan tinker
+    ```
+    
+    In the Tinker console:
+    
+    ```php
+    $user = App\Models\User::where('email', 'your@email.com')->first();
+    $user->role = 'admin';
+    $user->save();
+    exit
+    ```
+  </Step>
+  
+  <Step title="Configure Platform Settings">
+    Log in to your admin account and navigate to the Admin dashboard to configure:
+    
+    - **Registration settings**: Enable/disable new user registration
+    - **Password reset**: Enable/disable password reset functionality
+    - **AI provider**: Choose OpenAI or Google Gemini (if using AI features)
+    - **AI API keys**: Enter your API keys for the selected provider
+    - **AI daily limits**: Set per-user daily limits for AI generation
+  </Step>
+  
+  <Step title="Test the Installation">
+    Verify everything is working:
+    
+    1. **Create a webhook**: Add a Discord webhook and verify it validates correctly
+    2. **Send a message**: Send a test message and verify it appears in Discord
+    3. **Schedule a message**: Create a scheduled message for 2-3 minutes in the future and verify it sends
+    4. **Check logs**: Monitor application logs for any errors
+    
+    ```bash
+    # Application logs
+    tail -f /var/www/discord-webhook-manager/app/storage/logs/laravel.log
+    
+    # Worker logs
+    tail -f /var/www/discord-webhook-manager/app/storage/logs/worker.log
+    ```
+  </Step>
+</Steps>
+
+## Monitoring & Maintenance
+
+### Log Files
+
+Monitor these log files for issues:
+
+```bash
+# Application logs
+tail -f /var/www/discord-webhook-manager/app/storage/logs/laravel.log
+
+# Queue worker logs
+tail -f /var/www/discord-webhook-manager/app/storage/logs/worker.log
+
+# Nginx access logs
+sudo tail -f /var/log/nginx/access.log
+
+# Nginx error logs
+sudo tail -f /var/log/nginx/error.log
+```
+
+### Queue Management
+
+Useful commands for managing the queue:
+
+```bash
+cd /var/www/discord-webhook-manager/app
+
+# Monitor queue status
+php artisan queue:monitor
+
+# View failed jobs
+php artisan queue:failed
+
+# Retry failed jobs
+php artisan queue:retry all
+
+# Clear all jobs from queue
+php artisan queue:clear
+```
+
+### Worker Management
+
+Manage Supervisor workers:
+
+```bash
+# Check status
+sudo supervisorctl status discord-worker:*
+
+# Restart workers
+sudo supervisorctl restart discord-worker:*
+
+# Stop workers
+sudo supervisorctl stop discord-worker:*
+
+# Start workers
+sudo supervisorctl start discord-worker:*
+
+# View real-time logs
+sudo supervisorctl tail -f discord-worker:discord-worker_00
+```
+
+### Automatic File Cleanup
+
+<Info>
+  The application automatically deletes file attachments from scheduled messages after they are sent to save storage space. No manual cleanup is required.
+</Info>
+
+Files are stored in: `/var/www/discord-webhook-manager/app/storage/app/scheduled_messages/`
+
+### Database Backups
+
+Set up automatic PostgreSQL backups:
+
+```bash
+# Create backup script
+sudo nano /usr/local/bin/backup-discord-db.sh
+```
+
+Add the following:
+
+```bash
+#!/bin/bash
+BACKUP_DIR="/var/backups/discord-webhook"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+
+mkdir -p $BACKUP_DIR
+pg_dump -U webhook_user discord_webhook | gzip > "$BACKUP_DIR/discord_webhook_$TIMESTAMP.sql.gz"
+
+# Keep only last 7 days of backups
+find $BACKUP_DIR -name "*.sql.gz" -mtime +7 -delete
+```
+
+Make executable and add to cron:
+
+```bash
+sudo chmod +x /usr/local/bin/backup-discord-db.sh
+sudo crontab -e
+```
+
+Add:
+```bash
+0 2 * * * /usr/local/bin/backup-discord-db.sh
+```
+
+## Updating the Application
+
+When updates are available:
+
+<Steps>
+  <Step title="Backup Database">
+    Always backup before updating:
+    ```bash
+    pg_dump -U webhook_user discord_webhook > backup_before_update.sql
+    ```
+  </Step>
+  
+  <Step title="Pull Latest Code">
+    ```bash
+    cd /var/www/discord-webhook-manager
+    sudo -u www-data git pull origin main
+    ```
+  </Step>
+  
+  <Step title="Update Dependencies">
+    ```bash
+    cd /var/www/discord-webhook-manager/app
+    composer install --optimize-autoloader --no-dev
+    npm install
+    npm run build
+    ```
+  </Step>
+  
+  <Step title="Run Migrations">
+    ```bash
+    php artisan migrate --force
+    ```
+  </Step>
+  
+  <Step title="Clear Cache">
+    ```bash
+    php artisan cache:clear
+    php artisan config:clear
+    php artisan route:clear
+    php artisan view:clear
+    php artisan optimize
+    ```
+  </Step>
+  
+  <Step title="Restart Workers">
+    ```bash
+    sudo supervisorctl restart discord-worker:*
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Queue workers not processing jobs" icon="circle-exclamation">
+    **Check worker status:**
+    ```bash
+    sudo supervisorctl status discord-worker:*
+    ```
+    
+    **Restart workers:**
+    ```bash
+    sudo supervisorctl restart discord-worker:*
+    ```
+    
+    **Check worker logs:**
+    ```bash
+    tail -f /var/www/discord-webhook-manager/app/storage/logs/worker.log
+    ```
+    
+    **Verify Redis is running:**
+    ```bash
+    redis-cli ping
+    ```
+  </Accordion>
+  
+  <Accordion title="Scheduled messages not sending" icon="clock">
+    **Verify cron is configured:**
+    ```bash
+    sudo crontab -l -u www-data
+    ```
+    
+    **Manually test scheduler:**
+    ```bash
+    cd /var/www/discord-webhook-manager/app
+    php artisan schedule:run
+    ```
+    
+    **Check scheduled messages status:**
+    ```bash
+    php artisan tinker
+    ```
+    
+    Then:
+    ```php
+    App\Models\ScheduledMessage::where('status', 'pending')->get();
+    ```
+  </Accordion>
+  
+  <Accordion title="500 Internal Server Error" icon="server">
+    **Check application logs:**
+    ```bash
+    tail -f /var/www/discord-webhook-manager/app/storage/logs/laravel.log
+    ```
+    
+    **Check Nginx error logs:**
+    ```bash
+    sudo tail -f /var/log/nginx/error.log
+    ```
+    
+    **Verify file permissions:**
+    ```bash
+    sudo chown -R www-data:www-data /var/www/discord-webhook-manager
+    sudo chmod -R 775 /var/www/discord-webhook-manager/app/storage
+    sudo chmod -R 775 /var/www/discord-webhook-manager/app/bootstrap/cache
+    ```
+  </Accordion>
+  
+  <Accordion title="Database connection failed" icon="database">
+    **Test database connection:**
+    ```bash
+    psql -U webhook_user -d discord_webhook -h 127.0.0.1
+    ```
+    
+    **Verify .env database settings:**
+    ```bash
+    grep DB_ /var/www/discord-webhook-manager/app/.env
+    ```
+    
+    **Check PostgreSQL is running:**
+    ```bash
+    sudo systemctl status postgresql
+    ```
+  </Accordion>
+  
+  <Accordion title="Email notifications not sending" icon="envelope">
+    **Verify SMTP settings in .env**
+    
+    **Test email configuration:**
+    ```bash
+    php artisan tinker
+    ```
+    
+    Then:
+    ```php
+    Mail::raw('Test email', function($msg) {
+        $msg->to('your@email.com')->subject('Test');
+    });
+    ```
+    
+    **Check mail logs:**
+    ```bash
+    grep -i mail /var/www/discord-webhook-manager/app/storage/logs/laravel.log
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Security Best Practices
+
+<Warning>
+  Follow these security practices to protect your installation:
+</Warning>
+
+- **Firewall**: Configure UFW to only allow necessary ports (80, 443, 22)
+- **SSH**: Disable password authentication, use SSH keys only
+- **Database**: Never expose PostgreSQL to the internet
+- **Updates**: Keep Ubuntu, PHP, and all packages up to date
+- **Backups**: Maintain regular database backups stored securely off-server
+- **Monitoring**: Set up log monitoring and alerting
+- **Rate Limiting**: Laravel includes rate limiting; review and adjust as needed
+- **SSL**: Always use HTTPS in production with valid SSL certificates
+
+## Performance Optimization
+
+### PHP-FPM Tuning
+
+Edit PHP-FPM configuration:
+
+```bash
+sudo nano /etc/php/8.4/fpm/pool.d/www.conf
+```
+
+Adjust based on your server resources:
+
+```ini
+pm = dynamic
+pm.max_children = 20
+pm.start_servers = 4
+pm.min_spare_servers = 2
+pm.max_spare_servers = 6
+pm.max_requests = 500
+```
+
+### Redis Configuration
+
+For better performance, configure Redis:
+
+```bash
+sudo nano /etc/redis/redis.conf
+```
+
+Key settings:
+```ini
+maxmemory 256mb
+maxmemory-policy allkeys-lru
+```
+
+### Laravel Optimization
+
+```bash
+cd /var/www/discord-webhook-manager/app
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan optimize
+```
+
+<Warning>
+  Run `php artisan config:clear` before editing `.env` files, as cached config takes precedence.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+    Learn how to use your newly installed Discord Webhook Manager
+  </Card>
+  
+  <Card title="Admin Dashboard" icon="gauge" href="/admin/dashboard">
+    Configure platform settings and manage users
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Integrate webhook management into your applications
+  </Card>
+  
+  <Card title="GitHub Repository" icon="github" href="https://github.com/edgarqs/DiscordWebhook">
+    Report issues or contribute to the project
+  </Card>
+</CardGroup>

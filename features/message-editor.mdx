@@ -1,0 +1,452 @@
+---
+title: 'Visual Message Editor'
+description: 'Create rich Discord messages with embeds, fields, images, and real-time preview'
+icon: 'message-square'
+---
+
+## Overview
+
+The Visual Message Editor provides a powerful, user-friendly interface to create complex Discord messages with embeds, file attachments, and rich formatting. All changes are reflected in a real-time preview that matches Discord's appearance.
+
+## Sending Modes
+
+The editor supports two ways to send messages:
+
+<Tabs>
+  <Tab title="Existing Webhook">
+    Select a saved webhook from your collection:
+    
+    - Choose from a dropdown of your webhooks
+    - See webhook preview with avatar and name
+    - Automatically uses webhook's configured name and avatar
+    - Message is logged in webhook history
+    - Can load templates associated with the webhook
+    
+    **Best for**: Regular use with your managed webhooks
+  </Tab>
+  
+  <Tab title="Temporary Webhook">
+    Use a webhook URL directly without saving:
+    
+    - Paste any Discord webhook URL
+    - Customize name and avatar for this message only
+    - No history tracking
+    - Quick one-time sends
+    
+    **Best for**: Testing, one-off messages, or webhooks you don't own
+    
+    <Note>
+      Temporary webhooks are validated but not stored in your account.
+    </Note>
+  </Tab>
+</Tabs>
+
+## Message Components
+
+The editor is organized into three main tabs:
+
+### Content Tab
+
+Create the basic message content:
+
+<ParamField path="content" type="string">
+  Plain text content of the message (max 2000 characters)
+  
+  Supports:
+  - Discord markdown formatting (bold, italic, code blocks)
+  - Mentions (@user, @role, @everyone)
+  - Custom emojis
+  - Dynamic variables ({{date}}, {{username}}, etc.)
+</ParamField>
+
+**Character Counter**: Real-time character count with warning when approaching the 2000 character limit.
+
+### Embeds Tab
+
+Create up to 10 rich embeds per message. Each embed can contain:
+
+<Tabs>
+  <Tab title="Basic Info">
+    <ParamField path="title" type="string">
+      Embed title (max 256 characters)
+      
+      Displayed as a clickable heading if URL is provided.
+    </ParamField>
+    
+    <ParamField path="description" type="string">
+      Main embed content (max 4096 characters)
+      
+      Supports full Discord markdown formatting.
+    </ParamField>
+    
+    <ParamField path="url" type="string">
+      Optional URL to make the title clickable
+    </ParamField>
+    
+    <ParamField path="color" type="integer">
+      Embed color (color picker or hex value)
+      
+      Displays as a colored bar on the left side of the embed.
+    </ParamField>
+  </Tab>
+  
+  <Tab title="Author">
+    Add author information at the top of the embed:
+    
+    ```json
+    {
+      "author": {
+        "name": "John Doe",
+        "url": "https://example.com/profile",
+        "icon_url": "https://example.com/avatar.png"
+      }
+    }
+    ```
+    
+    - **Name**: Author name (max 256 characters)
+    - **URL**: Optional link when clicking the author name
+    - **Icon URL**: Small circular image next to author name
+  </Tab>
+  
+  <Tab title="Footer">
+    Add footer text at the bottom of the embed:
+    
+    ```json
+    {
+      "footer": {
+        "text": "Sent from Discord Webhook Manager",
+        "icon_url": "https://example.com/footer-icon.png"
+      }
+    }
+    ```
+    
+    - **Text**: Footer text (max 2048 characters)
+    - **Icon URL**: Small image displayed next to footer text
+  </Tab>
+  
+  <Tab title="Images">
+    Add visual content to your embed:
+    
+    **Main Image** (Large image displayed in the embed):
+    ```json
+    {
+      "image": {
+        "url": "https://example.com/large-image.png"
+      }
+    }
+    ```
+    
+    **Thumbnail** (Small image on the right side):
+    ```json
+    {
+      "thumbnail": {
+        "url": "https://example.com/thumbnail.png"
+      }
+    }
+    ```
+    
+    <Note>
+      Images must be publicly accessible URLs. Discord will not display images from private URLs.
+    </Note>
+  </Tab>
+  
+  <Tab title="Fields">
+    Add up to 25 fields to organize information:
+    
+    ```json
+    {
+      "fields": [
+        {
+          "name": "Field Title",
+          "value": "Field content",
+          "inline": true
+        }
+      ]
+    }
+    ```
+    
+    <ParamField path="name" type="string" required>
+      Field title (max 256 characters)
+    </ParamField>
+    
+    <ParamField path="value" type="string" required>
+      Field content (max 1024 characters)
+    </ParamField>
+    
+    <ParamField path="inline" type="boolean">
+      Display field inline with others (up to 3 per row)
+      
+      Default: false (full width)
+    </ParamField>
+    
+    **Field Layout Tips**:
+    - Inline fields appear side-by-side (max 3 per row)
+    - Non-inline fields take full width
+    - Mix inline and non-inline for custom layouts
+  </Tab>
+  
+  <Tab title="Timestamp">
+    Add a timestamp to your embed:
+    
+    ```json
+    {
+      "timestamp": "2024-03-06T12:00:00Z"
+    }
+    ```
+    
+    The timestamp appears in the footer and is automatically converted to the viewer's local timezone.
+    
+    <Note>
+      Use the "Add Timestamp" button to insert the current time automatically.
+    </Note>
+  </Tab>
+</Tabs>
+
+#### Managing Embeds
+
+- **Add Embed**: Click "Add Embed" button (max 10 embeds)
+- **Collapse/Expand**: Toggle embed sections to reduce clutter
+- **Reorder**: Drag and drop embeds to change their order
+- **Delete**: Remove embeds with the trash icon
+- **Duplicate**: Copy an embed with all its settings
+
+### Files Tab
+
+Attach up to 10 files per message:
+
+<ParamField path="files" type="array">
+  File attachments (max 10 files, 10MB each)
+  
+  **Supported formats**:
+  - Images: jpg, jpeg, png, gif, webp
+  - Videos: mp4, mov, avi
+  
+  **File size limit**: 10MB per file (10,240 KB)
+</ParamField>
+
+**File Upload Interface**:
+1. Click "Upload Files" or drag and drop
+2. Preview uploaded files with thumbnails
+3. Remove files individually before sending
+4. Files are automatically cleaned up after sending
+
+<Warning>
+  Files are temporarily stored on the server and deleted immediately after the message is sent to save storage space.
+</Warning>
+
+## Dynamic Variables
+
+Use variables in your messages for dynamic content:
+
+<CodeGroup>
+```text Date & Time
+{{date}}      → 06/03/2026
+{{time}}      → 14:30
+{{datetime}}  → 06/03/2026 14:30
+{{day}}       → Friday
+{{month}}     → March
+{{year}}      → 2026
+```
+
+```text User Info
+{{username}}    → John Doe
+{{user_email}}  → john@example.com
+```
+
+```text Webhook Info
+{{webhook_name}} → My Webhook
+```
+</CodeGroup>
+
+Variables are replaced when the message is sent:
+
+```text Example Usage
+Daily Report - {{date}}
+
+Hello {{username}}!
+This message was sent via {{webhook_name}} at {{time}}.
+```
+
+**Variable Helper**: Click the variable icon to see all available variables with descriptions and example values.
+
+## Real-Time Validation
+
+The editor validates your message against Discord's limits:
+
+<Tabs>
+  <Tab title="Content Limits">
+    - Message content: 2000 characters
+    - Embed title: 256 characters
+    - Embed description: 4096 characters
+    - Field name: 256 characters
+    - Field value: 1024 characters
+    - Footer text: 2048 characters
+    - Author name: 256 characters
+  </Tab>
+  
+  <Tab title="Quantity Limits">
+    - Embeds per message: 10
+    - Fields per embed: 25
+    - Files per message: 10
+    - File size: 10MB each
+  </Tab>
+  
+  <Tab title="Total Character Limit">
+    Discord enforces a total character limit across all embed components:
+    
+    **Maximum 6000 characters** across:
+    - All embed titles
+    - All embed descriptions  
+    - All field names and values
+    - All footer texts
+    - All author names
+    
+    The editor shows a warning when approaching this limit.
+  </Tab>
+</Tabs>
+
+## Mention Support
+
+The editor supports Discord mentions:
+
+- **\@everyone** - Mentions everyone in the server
+- **\@here** - Mentions online members
+- **\<\@USER_ID\>** - Mentions a specific user
+- **\<\@&ROLE_ID\>** - Mentions a specific role
+
+<Note>
+  Make sure the webhook has permissions to mention the target users/roles in the Discord channel.
+</Note>
+
+## Quick Send Features
+
+### Template Loading
+
+Load saved templates directly into the editor:
+
+1. Click "Load Template" button
+2. Select from your personal or shared templates
+3. Template content populates the editor
+4. Variables are preserved (not replaced until send)
+5. Modify as needed before sending
+
+### AI Generation
+
+<Note>
+  AI generation is available to users with the `can_use_ai` flag enabled.
+</Note>
+
+Generate message content automatically:
+
+1. Click the Sparkles (✨) icon
+2. Choose generation type:
+   - Generate title
+   - Generate description
+   - Generate full message
+3. Provide a prompt describing what you want
+4. AI generates content using OpenAI GPT or Google Gemini
+5. Review and edit the generated content
+
+**Supported AI Engines**:
+- OpenAI GPT (default)
+- Google Gemini
+
+Daily usage limits apply based on your account settings.
+
+## Sending Messages
+
+<Steps>
+  <Step title="Compose Your Message">
+    Use the tabs to add content, embeds, and files. The preview updates in real-time.
+  </Step>
+  
+  <Step title="Validate">
+    Ensure all validation errors are resolved (red indicators).
+  </Step>
+  
+  <Step title="Select Webhook">
+    Choose an existing webhook or enter a temporary webhook URL.
+  </Step>
+  
+  <Step title="Send">
+    Click the "Send" button. The message is:
+    - Variable replacement applied
+    - Validation performed
+    - Files uploaded
+    - Sent to Discord API
+    - Logged in webhook history (for saved webhooks)
+    - Files automatically deleted from server
+  </Step>
+  
+  <Step title="Confirmation">
+    Success or error notification appears:
+    - ✅ Success: Message sent successfully
+    - ❌ Error: Displays Discord API error message
+  </Step>
+</Steps>
+
+## Message History
+
+For saved webhooks, all sent messages are tracked:
+
+- Timestamp
+- Message content (full payload)
+- Status (success/failed)
+- User who sent it
+- Discord API response
+- Error details (if failed)
+
+Access history from the webhook details page.
+
+## Best Practices
+
+1. **Use the Preview**: Always check the real-time preview before sending
+
+2. **Test with Temporary Webhooks**: Use temporary webhook mode for testing
+
+3. **Save as Template**: Save frequently used messages as templates
+
+4. **Mind Character Limits**: Watch the character counters to avoid errors
+
+5. **Use Inline Fields Wisely**: Group related information with inline fields
+
+6. **Optimize Images**: Use appropriately sized images to avoid slow loading
+
+7. **Variables for Flexibility**: Use variables instead of hardcoding dates/names
+
+8. **Consistent Formatting**: Maintain consistent color schemes and formatting across embeds
+
+## Keyboard Shortcuts
+
+- **Ctrl/Cmd + Enter**: Send message
+- **Ctrl/Cmd + S**: Save as template (when available)
+- **Escape**: Close modals/dialogs
+
+## Troubleshooting
+
+### Message Not Sending
+
+1. Check webhook URL is valid
+2. Ensure webhook has permission to post in the channel
+3. Verify all content is within Discord limits
+4. Check file sizes are under 10MB
+5. Ensure webhook hasn't been deleted in Discord
+
+### Variables Not Replacing
+
+- Variables are only replaced when sending, not in preview
+- Ensure correct syntax: `{{variable_name}}`
+- Check variable name is spelled correctly
+
+### Embeds Not Displaying
+
+- Ensure at least one field has content (title or description)
+- Check image URLs are publicly accessible
+- Verify color codes are valid integers
+- Ensure total character count is under 6000
+
+## Related Features
+
+- [Webhooks](/features/webhooks) - Manage your webhook collection
+- [Templates](/features/templates) - Save messages for reuse
+- [Scheduled Messages](/features/scheduled-messages) - Automate message delivery

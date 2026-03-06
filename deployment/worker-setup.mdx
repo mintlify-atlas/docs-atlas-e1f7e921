@@ -1,0 +1,494 @@
+---
+title: Queue Worker & Scheduler Setup
+description: Configure Supervisor for queue workers and cron for Laravel scheduler
+---
+
+Queue workers and the Laravel scheduler are **essential** for Discord Webhook Manager to function properly. Without them, scheduled messages will not be sent.
+
+<Warning>
+  This configuration is **CRITICAL**. Skipping this step will break scheduled message functionality.
+</Warning>
+
+## Architecture Overview
+
+The scheduled message system works as follows:
+
+1. **Cron** executes `php artisan schedule:run` every minute
+2. **Laravel Scheduler** triggers the `scheduled-messages:process` command
+3. **Command** finds messages where `next_send_at <= now()`
+4. **Job** dispatches `SendScheduledMessage` to the Redis queue
+5. **Worker** (managed by Supervisor):
+   - Sends the payload to Discord API
+   - For recurring messages: calculates next send time
+   - For one-time messages: marks as completed
+   - Deletes attachment files after sending
+
+## Queue Worker Setup (Supervisor)
+
+### 1. Install Supervisor
+
+If not already installed:
+
+```bash
+sudo apt update
+sudo apt install -y supervisor
+
+# Start and enable Supervisor
+sudo systemctl start supervisor
+sudo systemctl enable supervisor
+```
+
+### 2. Create Worker Configuration
+
+Create a Supervisor configuration file:
+
+```bash
+sudo nano /etc/supervisor/conf.d/discord-worker.conf
+```
+
+Add the following configuration:
+
+```ini
+[program:discord-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/discord-webhook-manager/app/artisan queue:work redis --queue=default --sleep=3 --tries=3 --max-time=3600
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+numprocs=2
+redirect_stderr=true
+stdout_logfile=/var/www/discord-webhook-manager/app/storage/logs/worker.log
+stopwaitsecs=3600
+```
+
+### Configuration Breakdown
+
+<Steps>
+  <Step title="process_name">
+    Names each worker process uniquely (`discord-worker_00`, `discord-worker_01`, etc.)
+  </Step>
+
+  <Step title="command">
+    The queue worker command with options:
+    - `queue:work redis`: Process jobs from Redis queue
+    - `--queue=default`: Listen to the default queue
+    - `--sleep=3`: Sleep 3 seconds when no jobs available
+    - `--tries=3`: Retry failed jobs up to 3 times
+    - `--max-time=3600`: Restart worker after 1 hour (prevents memory leaks)
+  </Step>
+
+  <Step title="autostart & autorestart">
+    Worker starts automatically on boot and restarts if it crashes
+  </Step>
+
+  <Step title="user">
+    Run as `www-data` user (same as web server)
+  </Step>
+
+  <Step title="numprocs">
+    Number of worker processes (2 recommended for production)
+    
+    <Note>
+      Increase to 4-8 workers for high-volume deployments.
+    </Note>
+  </Step>
+
+  <Step title="stdout_logfile">
+    Log file location for worker output and errors
+  </Step>
+
+  <Step title="stopwaitsecs">
+    Wait up to 1 hour for jobs to finish before killing worker during shutdown
+  </Step>
+</Steps>
+
+### 3. Update Supervisor
+
+Load the new configuration and start workers:
+
+```bash
+# Reload Supervisor configuration
+sudo supervisorctl reread
+
+# Update Supervisor to apply changes
+sudo supervisorctl update
+
+# Start the workers
+sudo supervisorctl start discord-worker:*
+```
+
+### 4. Verify Workers Are Running
+
+```bash
+# Check worker status
+sudo supervisorctl status discord-worker:*
+```
+
+You should see output like:
+
+```
+discord-worker:discord-worker_00   RUNNING   pid 12345, uptime 0:00:10
+discord-worker:discord-worker_01   RUNNING   pid 12346, uptime 0:00:10
+```
+
+<Note>
+  If workers show `FATAL` or `EXITED` status, check the worker log for errors:
+  ```bash
+  tail -f /var/www/discord-webhook-manager/app/storage/logs/worker.log
+  ```
+</Note>
+
+## Laravel Scheduler Setup (Cron)
+
+### 1. Understanding the Scheduler
+
+Laravel's scheduler is a single cron entry that runs every minute. It then internally manages all scheduled tasks defined in the application.
+
+### 2. Configure Cron
+
+Edit the crontab for the `www-data` user:
+
+```bash
+sudo crontab -u www-data -e
+```
+
+Add this line at the end:
+
+```bash
+* * * * * cd /var/www/discord-webhook-manager/app && php artisan schedule:run >> /dev/null 2>&1
+```
+
+### Cron Entry Breakdown
+
+- `* * * * *`: Run every minute
+- `cd /var/www/discord-webhook-manager/app`: Change to application directory
+- `php artisan schedule:run`: Execute Laravel scheduler
+- `>> /dev/null 2>&1`: Suppress output (logged by Laravel instead)
+
+<Warning>
+  Make sure the path matches your actual installation directory. The cron job must run as the `www-data` user to have proper permissions.
+</Warning>
+
+### 3. Verify Cron is Active
+
+Check the crontab was saved:
+
+```bash
+sudo crontab -u www-data -l
+```
+
+You should see your scheduler entry.
+
+### 4. Test the Scheduler
+
+Manually run the scheduler to test:
+
+```bash
+cd /var/www/discord-webhook-manager/app
+sudo -u www-data php artisan schedule:run
+```
+
+Check the output for any errors.
+
+## Worker Management Commands
+
+### Supervisor Commands
+
+<CodeGroup>
+```bash Check Status
+sudo supervisorctl status discord-worker:*
+```
+
+```bash Start Workers
+sudo supervisorctl start discord-worker:*
+```
+
+```bash Stop Workers
+sudo supervisorctl stop discord-worker:*
+```
+
+```bash Restart Workers
+sudo supervisorctl restart discord-worker:*
+```
+
+```bash View Logs
+sudo supervisorctl tail -f discord-worker:discord-worker_00
+```
+</CodeGroup>
+
+### Laravel Queue Commands
+
+<CodeGroup>
+```bash Monitor Queue
+php artisan queue:monitor
+```
+
+```bash Clear Failed Jobs
+php artisan queue:flush
+```
+
+```bash Retry Failed Jobs
+php artisan queue:retry all
+```
+
+```bash View Failed Jobs
+php artisan queue:failed
+```
+</CodeGroup>
+
+## Monitoring and Maintenance
+
+### 1. Check Worker Logs
+
+Monitor worker activity:
+
+```bash
+tail -f /var/www/discord-webhook-manager/app/storage/logs/worker.log
+```
+
+### 2. Check Laravel Logs
+
+View application logs:
+
+```bash
+tail -f /var/www/discord-webhook-manager/app/storage/logs/laravel.log
+```
+
+### 3. Monitor Queue Size
+
+Check pending jobs in Redis:
+
+```bash
+redis-cli
+LLEN queues:default
+exit
+```
+
+A continuously growing queue indicates workers can't keep up.
+
+### 4. Monitor System Resources
+
+Check resource usage:
+
+```bash
+# CPU and memory usage
+top -u www-data
+
+# Worker processes
+ps aux | grep "queue:work"
+```
+
+## Updating Worker Configuration
+
+When you change the Supervisor configuration:
+
+<Steps>
+  <Step title="Edit configuration">
+    ```bash
+    sudo nano /etc/supervisor/conf.d/discord-worker.conf
+    ```
+  </Step>
+
+  <Step title="Reload and restart">
+    ```bash
+    sudo supervisorctl reread
+    sudo supervisorctl update
+    sudo supervisorctl restart discord-worker:*
+    ```
+  </Step>
+
+  <Step title="Verify status">
+    ```bash
+    sudo supervisorctl status discord-worker:*
+    ```
+  </Step>
+</Steps>
+
+## Deployment Updates
+
+After deploying code updates that affect queue jobs:
+
+```bash
+# Restart workers to load new code
+sudo supervisorctl restart discord-worker:*
+
+# Or use artisan command
+php artisan queue:restart
+```
+
+<Note>
+  The `queue:restart` command signals workers to restart gracefully after finishing current jobs.
+</Note>
+
+## Alternative: Database Queue
+
+If Redis is unavailable, you can use database-backed queues:
+
+### 1. Update Environment
+
+```bash
+# In .env
+QUEUE_CONNECTION=database
+```
+
+### 2. Update Supervisor Configuration
+
+```ini
+[program:discord-worker]
+command=php /var/www/discord-webhook-manager/app/artisan queue:work database --queue=default --sleep=3 --tries=3 --max-time=3600
+# ... rest of configuration
+```
+
+### 3. Create Jobs Table
+
+```bash
+php artisan queue:table
+php artisan migrate
+```
+
+<Warning>
+  Database queues are significantly slower than Redis. Use Redis for production deployments.
+</Warning>
+
+## Troubleshooting
+
+### Workers Not Processing Jobs
+
+1. **Check workers are running**:
+   ```bash
+   sudo supervisorctl status discord-worker:*
+   ```
+
+2. **Check worker logs**:
+   ```bash
+   tail -f storage/logs/worker.log
+   ```
+
+3. **Verify queue connection**:
+   ```bash
+   php artisan queue:monitor
+   ```
+
+4. **Test Redis connection**:
+   ```bash
+   redis-cli ping
+   ```
+
+### Scheduler Not Running
+
+1. **Verify cron is configured**:
+   ```bash
+   sudo crontab -u www-data -l
+   ```
+
+2. **Check cron logs**:
+   ```bash
+   sudo grep CRON /var/log/syslog
+   ```
+
+3. **Manually test scheduler**:
+   ```bash
+   sudo -u www-data php artisan schedule:run -v
+   ```
+
+### High Memory Usage
+
+If workers consume too much memory:
+
+1. **Reduce max-time**:
+   ```ini
+   # In supervisor config
+   command=php artisan queue:work redis --max-time=1800
+   ```
+
+2. **Add memory limit**:
+   ```ini
+   command=php artisan queue:work redis --memory=128
+   ```
+
+3. **Restart workers more frequently**:
+   ```bash
+   php artisan queue:restart
+   ```
+
+### Failed Jobs Accumulating
+
+1. **View failed jobs**:
+   ```bash
+   php artisan queue:failed
+   ```
+
+2. **Retry specific job**:
+   ```bash
+   php artisan queue:retry {job-id}
+   ```
+
+3. **Retry all failed jobs**:
+   ```bash
+   php artisan queue:retry all
+   ```
+
+4. **Clear failed jobs**:
+   ```bash
+   php artisan queue:flush
+   ```
+
+## Performance Tuning
+
+### Increase Workers for High Volume
+
+For high-traffic deployments:
+
+```ini
+[program:discord-worker]
+# ... other config
+numprocs=8  # Increase from 2 to 8
+```
+
+### Multiple Queue Priorities
+
+Create separate workers for priority queues:
+
+```ini
+[program:discord-worker-high]
+command=php artisan queue:work redis --queue=high,default --sleep=1 --tries=3
+numprocs=2
+
+[program:discord-worker-default]
+command=php artisan queue:work redis --queue=default --sleep=3 --tries=3
+numprocs=4
+```
+
+### Optimize Redis
+
+Tune Redis for queue performance:
+
+```bash
+# In /etc/redis/redis.conf
+maxmemory 512mb
+maxmemory-policy allkeys-lru
+```
+
+## Production Checklist
+
+Before going live, verify:
+
+- [ ] Supervisor is installed and enabled
+- [ ] Workers are running (`supervisorctl status`)
+- [ ] Cron is configured for `www-data` user
+- [ ] Scheduler runs successfully (`schedule:run`)
+- [ ] Worker logs are being written
+- [ ] Redis connection is working
+- [ ] Queue jobs process correctly
+- [ ] Failed jobs retry mechanism works
+- [ ] Workers restart after code deploys
+
+## Next Steps
+
+- Monitor worker logs regularly
+- Set up alerting for worker failures
+- Configure log rotation for worker logs
+- Plan for scaling workers based on load
+- Review [Redis migration guide](/deployment/configuration#redis-configuration) for optimization

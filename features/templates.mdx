@@ -1,0 +1,523 @@
+---
+title: 'Message Templates'
+description: 'Create, organize, and share reusable message templates with dynamic variables'
+icon: 'file-template'
+---
+
+## Overview
+
+Message Templates allow you to save and reuse message configurations, including content, embeds, and formatting. Templates support dynamic variables, categorization, and team collaboration, making it easy to maintain consistent messaging across your Discord servers.
+
+## Creating Templates
+
+<Steps>
+  <Step title="Navigate to Templates">
+    Click "Templates" in the sidebar menu to access your template library.
+  </Step>
+  
+  <Step title="Create New Template">
+    Click the "New Template" button to open the template editor.
+  </Step>
+  
+  <Step title="Configure Template Details">
+    Fill in the template information:
+    
+    <ParamField path="name" type="string" required>
+      Template name for easy identification (max 255 characters)
+      
+      Use descriptive names like "Daily Report", "Announcement Template", "Error Alert"
+    </ParamField>
+    
+    <ParamField path="description" type="string">
+      Optional description explaining the template's purpose and usage
+      
+      Help team members understand when and how to use this template.
+    </ParamField>
+    
+    <ParamField path="category" type="string">
+      Category for organization (e.g., "Announcements", "Reports", "Alerts")
+      
+      Templates can be filtered by category in the library view.
+    </ParamField>
+  </Step>
+  
+  <Step title="Design Message Content">
+    Use the full message editor to create your template:
+    - Add message content
+    - Create embeds with fields
+    - Set colors and formatting
+    - Include dynamic variables
+    - Configure author, footer, and images
+    
+    <Note>
+      The template editor is identical to the message editor, so you have access to all the same features.
+    </Note>
+  </Step>
+  
+  <Step title="Save Template">
+    Click "Save Template" to add it to your library.
+    
+    The template is now available for use in:
+    - Quick Send
+    - Webhook Send
+    - Scheduled Messages
+  </Step>
+</Steps>
+
+## Template Library
+
+Your template library shows all available templates:
+
+### Template Cards
+
+Each template displays:
+- Template name and category
+- Description
+- Preview of message content
+- Associated webhook (if any)
+- Last modified date
+- Permission level (owner/editor/viewer)
+- Quick action buttons
+
+### Filtering & Search
+
+<Tabs>
+  <Tab title="By Category">
+    Filter templates by category:
+    - Announcements
+    - Reports  
+    - Alerts
+    - Moderation
+    - Custom categories
+    
+    Categories are automatically populated from your templates.
+  </Tab>
+  
+  <Tab title="By Ownership">
+    Filter by ownership status:
+    - **My Templates**: Templates you created
+    - **Shared with Me**: Templates shared by others
+    - **All**: Combined view
+  </Tab>
+  
+  <Tab title="Search">
+    Search templates by:
+    - Name
+    - Description
+    - Category
+    - Content (searches within message content)
+    
+    Search is case-insensitive and searches across all fields.
+  </Tab>
+</Tabs>
+
+## Using Templates
+
+Templates can be used in multiple ways:
+
+### Quick Send
+
+<Steps>
+  <Step title="Open Quick Send">
+    Navigate to the Quick Send page from the sidebar.
+  </Step>
+  
+  <Step title="Load Template">
+    Click "Load Template" and select from the dropdown list.
+  </Step>
+  
+  <Step title="Customize & Send">
+    The template content loads into the editor. Make any necessary changes and send.
+    
+    Variables are preserved and will be replaced when you send the message.
+  </Step>
+</Steps>
+
+### URL Parameter Loading
+
+Templates can be loaded automatically via URL:
+
+```
+/send?template={template_id}
+```
+
+This opens Quick Send with the template pre-loaded, useful for bookmarks or external integrations.
+
+### Scheduled Messages
+
+When creating a scheduled message, you can:
+1. Select a template from the dropdown
+2. Template content is loaded
+3. Modify if needed
+4. Schedule for delivery
+
+The template reference is stored, so future changes to the template won't affect already scheduled messages.
+
+## Dynamic Variables
+
+Templates shine when using dynamic variables that are replaced at send time:
+
+### Available Variables
+
+<CodeGroup>
+```text Date & Time Variables
+{{date}}      - Current date (DD/MM/YYYY)
+{{time}}      - Current time (24h format)
+{{datetime}}  - Combined date and time
+{{day}}       - Day of week (Monday, Tuesday, etc.)
+{{month}}     - Month name (January, February, etc.)
+{{year}}      - Current year
+```
+
+```text User Variables
+{{username}}    - Name of the user sending the message
+{{user_email}}  - Email of the user sending the message
+```
+
+```text Webhook Variables
+{{webhook_name}} - Name of the webhook being used
+```
+</CodeGroup>
+
+### Variable Usage Examples
+
+<Tabs>
+  <Tab title="Daily Report">
+    ```markdown
+    # Daily Report - {{date}}
+    
+    Generated by: {{username}}
+    Report Time: {{time}}
+    
+    ## Summary
+    This is the daily report for {{day}}, {{month}} {{year}}.
+    
+    ---
+    Sent via: {{webhook_name}}
+    ```
+  </Tab>
+  
+  <Tab title="Announcement">
+    ```markdown
+    📢 New Announcement
+    
+    Posted by {{username}} on {{datetime}}
+    
+    [Your announcement content here]
+    
+    Questions? Contact {{user_email}}
+    ```
+  </Tab>
+  
+  <Tab title="Automated Alert">
+    ```markdown
+    ⚠️ System Alert
+    
+    Timestamp: {{datetime}}
+    Day: {{day}}
+    
+    This is an automated message sent through {{webhook_name}}.
+    
+    Alert details...
+    ```
+  </Tab>
+</Tabs>
+
+### Variable Preview
+
+When editing templates, click the variable helper icon (?) to see:
+- All available variables
+- Variable descriptions
+- Example replacement values
+- Copy-to-clipboard functionality
+
+<Note>
+  Variables are shown with example values in the preview, but actual values are inserted only when the message is sent.
+</Note>
+
+## Template Categories
+
+Organize templates by category for easy navigation:
+
+### Common Categories
+
+- **Announcements**: Server announcements, updates, news
+- **Reports**: Daily reports, weekly summaries, analytics
+- **Alerts**: Error alerts, system notifications, monitoring
+- **Moderation**: Warning messages, ban notifications, rules
+- **Events**: Event announcements, reminders, recaps
+- **Welcome**: Welcome messages, onboarding, introductions
+- **Custom**: Any custom categories you create
+
+### Category Best Practices
+
+1. Use consistent naming conventions
+2. Keep category names short and clear
+3. Don't over-categorize (5-10 categories is usually enough)
+4. Use categories that match your workflow
+5. Review and consolidate categories periodically
+
+## Sharing & Collaboration
+
+### Permission Levels
+
+Templates can be shared with team members:
+
+<CodeGroup>
+```json Owner
+{
+  "permission_level": "owner",
+  "can_view": true,
+  "can_edit": true,
+  "can_delete": true,
+  "can_share": true
+}
+```
+
+```json Editor
+{
+  "permission_level": "edit",
+  "can_view": true,
+  "can_edit": true,
+  "can_delete": false,
+  "can_share": false
+}
+```
+
+```json Viewer
+{
+  "permission_level": "view",
+  "can_view": true,
+  "can_edit": false,
+  "can_delete": false,
+  "can_share": false
+}
+```
+</CodeGroup>
+
+### Sharing Templates
+
+<Steps>
+  <Step title="Open Template Settings">
+    Click on a template and select "Share" or "Collaborators".
+  </Step>
+  
+  <Step title="Add Collaborators">
+    Enter email addresses and assign permission levels.
+  </Step>
+  
+  <Step title="Send Invitation">
+    Collaborators receive an email invitation to access the template.
+  </Step>
+  
+  <Step title="Manage Access">
+    View, modify, or revoke collaborator access at any time.
+  </Step>
+</Steps>
+
+### Template Collaborator Features
+
+- **View Access**: Can see template content and use it in messages
+- **Edit Access**: Can modify template content and settings
+- **Owner Access**: Full control including deletion and sharing
+
+Shared templates appear in the "Shared with Me" filter view.
+
+## Managing Templates
+
+### Editing Templates
+
+<Warning>
+  Editing a template affects all future uses but does NOT change already scheduled messages that reference this template.
+</Warning>
+
+1. Click on the template card
+2. Select "Edit"
+3. Modify content, embeds, or settings
+4. Save changes
+
+All users with access see the updated version immediately.
+
+### Duplicating Templates
+
+Create a copy of any template:
+
+1. Click on the template
+2. Select "Duplicate"
+3. Template is copied with " (Copy)" appended to the name
+4. Edit the duplicate independently
+
+**Use cases for duplication**:
+- Create variations of existing templates
+- Experiment without affecting the original
+- Fork shared templates for customization
+- Create backups before major edits
+
+### Deleting Templates
+
+<Warning>
+  Deleting a template is permanent and cannot be undone.
+</Warning>
+
+What happens when you delete a template:
+- Template is removed from your library
+- Scheduled messages using this template are NOT affected (they store a copy)
+- Collaborators lose access
+- Template content is permanently deleted
+
+Only the template owner can delete templates.
+
+## Template Content Structure
+
+Templates store complete message payloads:
+
+```json
+{
+  "content": {
+    "content": "Main message text with {{variables}}",
+    "embeds": [
+      {
+        "title": "Embed Title",
+        "description": "Embed description",
+        "color": 5814783,
+        "fields": [
+          {
+            "name": "Field Name",
+            "value": "Field Value",
+            "inline": true
+          }
+        ],
+        "author": {
+          "name": "Author Name",
+          "icon_url": "https://example.com/icon.png"
+        },
+        "footer": {
+          "text": "Footer text - {{date}}"
+        },
+        "timestamp": "2024-03-06T12:00:00Z",
+        "image": {
+          "url": "https://example.com/image.png"
+        },
+        "thumbnail": {
+          "url": "https://example.com/thumb.png"
+        }
+      }
+    ]
+  }
+}
+```
+
+This JSON structure is compatible with Discord's webhook API.
+
+## Template API Access
+
+### Getting Template with Variables Replaced
+
+The application provides an endpoint to get templates with variables replaced:
+
+```http
+GET /templates/{id}/with-variables?webhook_id={webhook_id}
+```
+
+Returns:
+```json
+{
+  "payload": { /* Message content with variables replaced */ },
+  "availableVariables": {
+    "date": "Current date (DD/MM/YYYY)",
+    "username": "Name of the user",
+    // ... all variables
+  }
+}
+```
+
+This is used by the UI to preview templates with actual values.
+
+## Best Practices
+
+### Template Design
+
+1. **Use Clear Names**: Make template names descriptive and searchable
+2. **Add Descriptions**: Explain when and how to use each template
+3. **Leverage Variables**: Use variables instead of hardcoding values
+4. **Consistent Formatting**: Maintain consistent style across templates
+5. **Test Before Saving**: Send a test message to verify appearance
+
+### Organization
+
+1. **Categorize Everything**: Assign categories to all templates
+2. **Regular Cleanup**: Delete unused templates periodically
+3. **Version in Names**: Include version numbers for evolving templates ("Report v2")
+4. **Duplicate for Safety**: Duplicate before making major changes
+5. **Document Usage**: Use descriptions to explain special variables or use cases
+
+### Collaboration
+
+1. **Minimum Permissions**: Grant the least access needed
+2. **Clear Ownership**: Designate a primary owner for each template
+3. **Communicate Changes**: Let team members know when shared templates change
+4. **Use Viewer Access**: Share read-only when users only need to use (not edit) templates
+5. **Regular Reviews**: Audit collaborator lists periodically
+
+## Advanced Use Cases
+
+### Multi-Language Templates
+
+Create template variations for different languages:
+- "Announcement EN"
+- "Announcement ES"  
+- "Announcement FR"
+
+Use category "Announcements" and filter by language in the name.
+
+### Template Inheritance
+
+Create base templates and duplicate for variations:
+1. Create "Base Report Template"
+2. Duplicate for specific reports
+3. Customize duplicates while maintaining structure
+4. Update base template when format changes
+5. Re-duplicate to propagate changes
+
+### Webhook-Specific Templates
+
+Associate templates with specific webhooks:
+- Template references webhook_id
+- Auto-selects correct webhook when loaded
+- Variables include webhook name
+- Organized by webhook in library
+
+## Troubleshooting
+
+### Template Not Loading
+
+1. Check you have view permissions
+2. Ensure template hasn't been deleted
+3. Verify template ID in URL is correct
+4. Clear browser cache and reload
+
+### Variables Not Replacing
+
+1. Check variable syntax: `{{variable_name}}`
+2. Ensure no extra spaces: `{{ variable }}` won't work
+3. Verify variable name is in the available list
+4. Remember: variables only replace when sending, not in preview
+
+### Can't Edit Template
+
+1. Check your permission level (need "edit" or "owner")
+2. Verify you're not trying to edit someone else's template
+3. Ensure template exists and hasn't been deleted
+
+### Shared Template Not Visible
+
+1. Check invitation was accepted
+2. Verify you're logged into the correct account
+3. Try the "Shared with Me" filter
+4. Contact template owner to verify permissions
+
+## Related Features
+
+- [Message Editor](/features/message-editor) - Design template content
+- [Scheduled Messages](/features/scheduled-messages) - Automate template delivery
+- [Webhooks](/features/webhooks) - Associate templates with webhooks

@@ -1,0 +1,211 @@
+---
+title: 'API Overview'
+description: 'Learn about the Discord Webhook Manager API, authentication, and best practices'
+icon: 'code'
+---
+
+## Introduction
+
+The Discord Webhook Manager API is built on Laravel and uses session-based authentication with Laravel Sanctum. All API endpoints are protected and require authentication.
+
+## Base URL
+
+All API endpoints are relative to your application's base URL:
+
+```
+https://your-domain.com/
+```
+
+## Authentication
+
+The application uses **Laravel Sanctum** for API authentication with session-based cookies. All requests must include:
+
+<ParamField header="X-CSRF-TOKEN" type="string" required>
+  CSRF token obtained from the application session
+</ParamField>
+
+<ParamField header="Cookie" type="string" required>
+  Session cookie containing authentication credentials
+</ParamField>
+
+### Authentication Flow
+
+1. Login through the web interface or authentication endpoint
+2. Receive session cookie and CSRF token
+3. Include both in subsequent API requests
+4. All routes require `auth` and `verified` middleware
+
+<CodeGroup>
+```javascript Example Request
+fetch('/api/webhooks', {
+  method: 'GET',
+  headers: {
+    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+    'Accept': 'application/json',
+    'Content-Type': 'application/json'
+  },
+  credentials: 'include'
+})
+```
+
+```php Laravel Example
+// Routes are protected by middleware
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::resource('webhooks', WebhookController::class);
+});
+```
+</CodeGroup>
+
+## Rate Limiting
+
+Certain endpoints have rate limiting applied:
+
+- **AI Generation**: 10 requests per minute per user
+- **Standard endpoints**: Laravel's default rate limiting applies
+
+## Response Format
+
+All responses follow standard HTTP status codes:
+
+<ResponseField name="success" type="boolean">
+  Indicates if the request was successful
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Contains the response payload
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable message about the operation
+</ResponseField>
+
+### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    // Response data
+  },
+  "message": "Operation completed successfully"
+}
+```
+
+### Error Response
+
+```json
+{
+  "success": false,
+  "message": "Error description",
+  "errors": {
+    "field_name": [
+      "Validation error message"
+    ]
+  }
+}
+```
+
+## Common HTTP Status Codes
+
+| Status Code | Meaning |
+|------------|--------|
+| 200 | OK - Request succeeded |
+| 201 | Created - Resource created successfully |
+| 302 | Redirect - Successful action with redirect |
+| 401 | Unauthorized - Authentication required |
+| 403 | Forbidden - Insufficient permissions |
+| 404 | Not Found - Resource doesn't exist |
+| 422 | Unprocessable Entity - Validation failed |
+| 429 | Too Many Requests - Rate limit exceeded |
+| 500 | Server Error - Internal server error |
+
+## Permissions & Authorization
+
+The application uses Laravel Policies for authorization:
+
+- **Owner**: Full access to all operations
+- **Collaborators**: Limited access based on permission level
+  - `view`: Read-only access
+  - `send`: Can send messages
+  - `edit`: Can modify resources
+
+## Pagination
+
+List endpoints support pagination:
+
+<ParamField query="page" type="integer" default="1">
+  Page number to retrieve
+</ParamField>
+
+<ParamField query="per_page" type="integer" default="20">
+  Number of items per page (max 100)
+</ParamField>
+
+```json Paginated Response
+{
+  "data": [...],
+  "current_page": 1,
+  "per_page": 20,
+  "total": 150,
+  "last_page": 8,
+  "next_page_url": "https://your-domain.com/api?page=2",
+  "prev_page_url": null
+}
+```
+
+## Variables & Dynamic Content
+
+The application supports dynamic variables in message content:
+
+- `{user.name}` - Current user's name
+- `{user.email}` - Current user's email
+- `{webhook.name}` - Webhook name
+- `{date}` - Current date
+- `{time}` - Current time
+- `{datetime}` - Current date and time
+
+Variables are automatically replaced when messages are sent.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Validate Discord URLs">
+    Always validate Discord webhook URLs before storing them. Use the `/webhooks/validate` endpoint to verify URLs with Discord's API.
+  </Accordion>
+
+  <Accordion title="Handle File Uploads">
+    Files must be uploaded as multipart/form-data with a maximum size of 10MB per file. Supported formats: jpg, jpeg, png, gif, webp, mp4, mov, avi.
+  </Accordion>
+
+  <Accordion title="Respect Discord Limits">
+    - Maximum 2000 characters for message content
+    - Maximum 10 embeds per message
+    - Maximum 256 characters for embed titles
+    - Maximum 4096 characters for embed descriptions
+    - Maximum 25 fields per embed
+  </Accordion>
+
+  <Accordion title="Error Handling">
+    Always check response status codes and handle errors gracefully. Validation errors return detailed field-level error messages.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Webhooks API" icon="webhook" href="/api/webhooks">
+    Manage Discord webhooks
+  </Card>
+  
+  <Card title="Messages API" icon="message" href="/api/messages">
+    Send messages to Discord
+  </Card>
+  
+  <Card title="Templates API" icon="file-code" href="/api/templates">
+    Create and manage templates
+  </Card>
+  
+  <Card title="Scheduled Messages" icon="clock" href="/api/scheduled">
+    Schedule recurring messages
+  </Card>
+</CardGroup>

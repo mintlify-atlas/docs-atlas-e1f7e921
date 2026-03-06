@@ -1,0 +1,462 @@
+---
+title: 'Automation & Scheduled Messages'
+description: 'Automate Discord message delivery with one-time and recurring schedules'
+icon: 'clock'
+---
+
+## Overview
+
+Scheduled Messages allow you to automate Discord communication by scheduling messages for future delivery. The system supports:
+
+- **One-time messages**: Send once at a specific date and time
+- **Recurring messages**: Repeat daily, weekly, or monthly
+- **File attachments**: Include images and videos (up to 10MB)
+- **Timezone support**: Schedule in your local timezone
+- **Pause/resume**: Control recurring message execution
+
+<Note>
+Scheduled messages are processed every minute by Laravel's scheduler and executed by queue workers.
+</Note>
+
+## Architecture
+
+The automation system uses multiple Laravel components:
+
+<Steps>
+  <Step title="Cron Job">
+    Executes `php artisan schedule:run` every minute
+  </Step>
+  
+  <Step title="Scheduler">
+    Launches the `scheduled-messages:process` command
+  </Step>
+  
+  <Step title="Command">
+    Finds messages where `next_send_at <= now()`
+  </Step>
+  
+  <Step title="Job Queue">
+    Dispatches `SendScheduledMessage` jobs to workers
+  </Step>
+  
+  <Step title="Worker Execution">
+    - Sends message to Discord API
+    - Updates `next_send_at` for recurring messages
+    - Marks one-time messages as completed
+    - Auto-deletes attached files after sending
+  </Step>
+</Steps>
+
+## Creating Scheduled Messages
+
+### One-Time Messages
+
+Schedule a message to send once at a specific date and time:
+
+<Steps>
+  <Step title="Navigate to Scheduled Messages">
+    Click **Scheduled Messages** in the sidebar, then **Create New**
+  </Step>
+  
+  <Step title="Select Webhook">
+    Choose which webhook will deliver the message
+    
+    <Tip>
+    You can select from your owned webhooks or those shared with you.
+    </Tip>
+  </Step>
+  
+  <Step title="Configure Message Content">
+    Compose your message using the visual editor:
+    
+    - Text content (max 2000 characters)
+    - Up to 10 embeds with full customization
+    - Optional template loading
+  </Step>
+  
+  <Step title="Set Schedule Type">
+    Select **One-time** and choose:
+    
+    - Date and time
+    - Timezone (default: Europe/Madrid)
+  </Step>
+  
+  <Step title="Attach Files (Optional)">
+    Upload images or videos:
+    
+    - Max 10 files per message
+    - 10MB per file limit
+    - Supported formats: JPG, PNG, GIF, WebP, MP4, MOV, AVI
+  </Step>
+</Steps>
+
+**Code Reference**: `app/app/Controllers/ScheduledMessageController.php:68-137`
+
+### Recurring Messages
+
+Create messages that repeat on a schedule:
+
+<CodeGroup>
+```json Daily
+{
+  "schedule_type": "recurring",
+  "recurrence_pattern": {
+    "frequency": "daily",
+    "time": "09:00"
+  },
+  "timezone": "America/New_York"
+}
+```
+
+```json Weekly
+{
+  "schedule_type": "recurring",
+  "recurrence_pattern": {
+    "frequency": "weekly",
+    "days": [1, 3, 5],
+    "time": "14:30"
+  },
+  "timezone": "Europe/London"
+}
+```
+
+```json Monthly
+{
+  "schedule_type": "recurring",
+  "recurrence_pattern": {
+    "frequency": "monthly",
+    "day": 1,
+    "time": "12:00"
+  },
+  "timezone": "Asia/Tokyo"
+}
+```
+</CodeGroup>
+
+<Warning>
+For weekly schedules, days are numbered 0-6 where 0 = Sunday, 1 = Monday, etc.
+</Warning>
+
+### Setting Send Limits
+
+Control how many times a recurring message will be sent:
+
+```php
+'max_sends' => 10 // Stop after 10 deliveries
+```
+
+Leave `max_sends` null for unlimited recurring messages.
+
+## File Attachments
+
+### Upload Process
+
+Files are stored temporarily during scheduling (`app/app/Controllers/ScheduledMessageController.php:120-133`):
+
+```php
+$path = $file->store("scheduled_messages/{$scheduledMessage->id}", 'local');
+
+$scheduledMessage->files()->create([
+    'filename' => $filename,
+    'stored_path' => $path,
+    'mime_type' => $file->getMimeType(),
+    'size' => $file->getSize(),
+]);
+```
+
+Files are stored in: `storage/app/scheduled_messages/{message_id}/`
+
+### Auto-Deletion
+
+<Tip>
+Files are automatically deleted after successful delivery to save storage space.
+</Tip>
+
+This happens in the `SendScheduledMessage` job after Discord confirms receipt.
+
+**Storage Path**: Files are stored using Laravel's local disk:
+```php
+'local' => [
+    'driver' => 'local',
+    'root' => storage_path('app'),
+],
+```
+
+## Managing Scheduled Messages
+
+### View All Messages
+
+The index page shows all your scheduled messages with filters:
+
+- **Status**: Pending, Completed, Failed, Paused
+- **Type**: One-time, Recurring
+- **Pagination**: 20 messages per page
+
+**Code Reference**: `app/app/Controllers/ScheduledMessageController.php:17-42`
+
+### Pause and Resume
+
+Control recurring message execution:
+
+**Pause a Message** (`app/app/Models/ScheduledMessage.php:179-184`):
+```php
+public function pause(): void
+{
+    if ($this->schedule_type === 'recurring' && $this->status === 'pending') {
+        $this->update(['status' => 'paused']);
+    }
+}
+```
+
+**Resume a Message** (`app/app/Models/ScheduledMessage.php:186-195`):
+```php
+public function resume(): void
+{
+    if ($this->status === 'paused') {
+        $nextSendTime = $this->calculateNextSendTime();
+        $this->update([
+            'status' => 'pending',
+            'next_send_at' => $nextSendTime,
+        ]);
+    }
+}
+```
+
+<Note>
+One-time messages cannot be paused since they execute once and complete.
+</Note>
+
+### Edit Scheduled Messages
+
+You can edit scheduled messages **only if they haven't been sent yet** (`app/app/Controllers/ScheduledMessageController.php:172-175`):
+
+```php
+if ($scheduled->send_count > 0) {
+    return back()->withErrors(['error' => 'Cannot edit a message that has already been sent']);
+}
+```
+
+Editable fields:
+- Webhook selection
+- Message content
+- Schedule time/pattern
+- Timezone
+- Max sends limit
+- File attachments
+
+### Delete Messages
+
+Deleting a scheduled message:
+1. Removes the database record
+2. Deletes all associated files via observer
+3. Cannot be undone
+
+**Code Reference**: `app/app/Controllers/ScheduledMessageController.php:252-261`
+
+## Timezone Handling
+
+The system converts all schedules to UTC for storage (`app/app/Controllers/ScheduledMessageController.php:85-88`):
+
+```php
+$nextSendAt = Carbon::parse($validated['scheduled_at'], $validated['timezone'])
+    ->setTimezone('UTC');
+```
+
+When calculating next send times for recurring messages, it converts back to the user's timezone, calculates the next occurrence, then converts to UTC for storage.
+
+**Supported Timezones**: Any valid PHP timezone identifier (e.g., `America/New_York`, `Europe/Paris`, `Asia/Tokyo`)
+
+## Message States
+
+Scheduled messages progress through several states:
+
+| State | Description | Next Actions |
+|-------|-------------|-------------|
+| **pending** | Waiting to be sent | Automatically processes when `next_send_at` arrives |
+| **processing** | Currently being sent | Transitions to `completed` or `failed` |
+| **completed** | Successfully sent (one-time) or reached max_sends | No further action |
+| **failed** | Delivery failed | Check `error_message` field, can be deleted |
+| **paused** | Manually paused (recurring only) | Can be resumed |
+
+**Code Reference**: `app/app/Models/ScheduledMessage.php:145-169` (markAsSent method)
+
+## Recurrence Calculation
+
+The system calculates next send times based on frequency (`app/app/Models/ScheduledMessage.php:88-143`):
+
+**Daily:**
+```php
+$next = $now->copy()->setTime((int)$hour, (int)$minute, 0);
+if ($next <= $now) {
+    $next->addDay();
+}
+```
+
+**Weekly:**
+```php
+for ($i = 0; $i < 7; $i++) {
+    if (in_array($next->dayOfWeek, $days) && $next > $now) {
+        $found = true;
+        break;
+    }
+    $next->addDay();
+}
+```
+
+**Monthly:**
+```php
+$next = $now->copy()->setTime((int)$hour, (int)$minute, 0)->day($day);
+if ($next <= $now) {
+    $next->addMonth();
+}
+```
+
+## Integration with Templates
+
+Load saved templates when creating scheduled messages:
+
+```php
+'template_id' => $validated['template_id'],
+```
+
+The template relationship is stored but the actual content is copied into `message_content`. This ensures the scheduled message remains unchanged even if the template is modified later.
+
+**Code Reference**: `app/app/Controllers/ScheduledMessageController.php:109`
+
+## Worker Configuration
+
+<Warning>
+**Production Requirement**: You must run queue workers continuously using Supervisor.
+</Warning>
+
+### Supervisor Configuration
+
+```ini
+[program:discord-webhook-worker]
+process_name=%(program_name)s_%(process_num)02d
+command=php /path/to/app/artisan queue:work --queue=default --sleep=3 --tries=3
+autostart=true
+autorestart=true
+user=www-data
+numprocs=2
+redirect_stderr=true
+stdout_logfile=/path/to/app/storage/logs/worker.log
+```
+
+### Cron Configuration
+
+Add to your crontab:
+
+```bash
+* * * * * php /path/to/app/artisan schedule:run >> /dev/null 2>&1
+```
+
+<Tip>
+Run `php artisan queue:work` in development mode for immediate processing.
+</Tip>
+
+## Monitoring and Debugging
+
+### Check Queue Status
+
+```bash
+php artisan queue:listen
+```
+
+### View Failed Jobs
+
+```bash
+php artisan queue:failed
+```
+
+### Retry Failed Jobs
+
+```bash
+php artisan queue:retry all
+```
+
+### Logs Location
+
+Scheduled message processing logs appear in:
+- `storage/logs/laravel.log` - General application logs
+- `storage/logs/worker.log` - Queue worker output (if using Supervisor)
+
+## Troubleshooting
+
+### Messages Not Sending
+
+<Steps>
+  <Step title="Verify Cron is Running">
+    ```bash
+    grep CRON /var/log/syslog
+    ```
+  </Step>
+  
+  <Step title="Check Queue Workers">
+    ```bash
+    ps aux | grep "queue:work"
+    ```
+  </Step>
+  
+  <Step title="Inspect Failed Jobs Table">
+    ```sql
+    SELECT * FROM failed_jobs ORDER BY failed_at DESC LIMIT 10;
+    ```
+  </Step>
+  
+  <Step title="Review Error Messages">
+    Check the `error_message` field on failed scheduled messages
+  </Step>
+</Steps>
+
+### File Upload Issues
+
+**Problem**: Files not attaching to messages
+
+**Solutions**:
+- Verify file size is under 10MB
+- Check file format is supported
+- Ensure `storage/app/scheduled_messages/` is writable
+- Review `upload_max_filesize` and `post_max_size` in `php.ini`
+
+### Timezone Confusion
+
+**Problem**: Messages sending at wrong times
+
+**Solutions**:
+- Verify timezone setting matches your location
+- Check server timezone: `date` command
+- Confirm timezone in `.env`: `APP_TIMEZONE=Europe/Madrid`
+- Ensure database stores UTC timestamps
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Test First" icon="flask">
+    Create one-time messages in the near future to verify configuration before setting up recurring messages.
+  </Card>
+  
+  <Card title="Set Max Sends" icon="hashtag">
+    For recurring messages, always set `max_sends` to prevent infinite loops during testing.
+  </Card>
+  
+  <Card title="Monitor Storage" icon="hard-drive">
+    If using many file attachments, monitor storage usage even though files auto-delete.
+  </Card>
+  
+  <Card title="Use Templates" icon="file-code">
+    Save frequently used messages as templates for quick scheduling.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Message History" icon="clock-rotate-left" href="/advanced/message-history">
+    View delivery history and analytics
+  </Card>
+  
+  <Card title="AI Generation" icon="sparkles" href="/advanced/ai-generation">
+    Generate message content automatically
+  </Card>
+</CardGroup>

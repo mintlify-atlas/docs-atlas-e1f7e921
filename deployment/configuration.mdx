@@ -1,0 +1,540 @@
+---
+title: Environment Configuration
+description: Complete guide to configuring Discord Webhook Manager environment variables
+---
+
+This guide covers all environment variables needed to configure Discord Webhook Manager.
+
+## Environment File Setup
+
+The application uses a `.env` file for configuration. This file is created from `.env.example`:
+
+```bash
+cd /var/www/discord-webhook-manager/app
+sudo cp .env.example .env
+sudo nano .env
+```
+
+<Warning>
+  Never commit the `.env` file to version control. It contains sensitive credentials.
+</Warning>
+
+## Core Application Settings
+
+### Application Configuration
+
+```bash
+# Application name (displayed in emails and UI)
+APP_NAME=WebhookManager
+
+# Environment: local, staging, production
+APP_ENV=production
+
+# Application key (generate with: php artisan key:generate)
+APP_KEY=base64:your-generated-key-here
+
+# Debug mode (MUST be false in production)
+APP_DEBUG=false
+
+# Your application URL
+APP_URL=https://yourdomain.com
+```
+
+<Warning>
+  **Never set `APP_DEBUG=true` in production.** This exposes sensitive information in error messages.
+</Warning>
+
+### Localization
+
+```bash
+# Application locale
+APP_LOCALE=en
+
+# Fallback locale
+APP_FALLBACK_LOCALE=en
+
+# Faker locale for testing
+APP_FAKER_LOCALE=en_US
+```
+
+### Logging
+
+```bash
+# Log channel: stack, single, daily, slack, syslog
+LOG_CHANNEL=stack
+
+# Stack configuration
+LOG_STACK=single
+
+# Log level: debug, info, notice, warning, error, critical, alert, emergency
+LOG_LEVEL=error
+
+# Deprecation warnings channel
+LOG_DEPRECATIONS_CHANNEL=null
+```
+
+<Note>
+  For production, use `LOG_LEVEL=error` to reduce log file size. Use `daily` channel for automatic log rotation.
+</Note>
+
+## Database Configuration
+
+### PostgreSQL (Recommended)
+
+```bash
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=discord_webhook
+DB_USERNAME=webhook_user
+DB_PASSWORD=your_secure_password
+```
+
+### MySQL Alternative
+
+```bash
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=discord_webhook
+DB_USERNAME=webhook_user
+DB_PASSWORD=your_secure_password
+```
+
+### SQLite (Development Only)
+
+```bash
+DB_CONNECTION=sqlite
+DB_HOST=127.0.0.1
+DB_PORT=
+DB_DATABASE=
+DB_USERNAME=
+DB_PASSWORD=
+```
+
+<Warning>
+  SQLite is only suitable for local development. Use PostgreSQL or MySQL for production.
+</Warning>
+
+## Redis Configuration
+
+Redis is **required** for optimal performance:
+
+```bash
+# Redis client (phpredis recommended)
+REDIS_CLIENT=phpredis
+
+# Redis server
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+# Redis connections
+REDIS_CACHE_CONNECTION=cache
+REDIS_QUEUE_CONNECTION=default
+```
+
+### Cache Configuration
+
+```bash
+# Cache driver: redis, database, file, memcached
+CACHE_STORE=redis
+
+# Optional cache prefix
+# CACHE_PREFIX=webhook_
+```
+
+<CodeGroup>
+```bash Redis (Recommended)
+CACHE_STORE=redis
+```
+
+```bash Database Fallback
+CACHE_STORE=database
+```
+
+```bash File-based (Development)
+CACHE_STORE=file
+```
+</CodeGroup>
+
+### Queue Configuration
+
+```bash
+# Queue connection: redis, database, sync
+QUEUE_CONNECTION=redis
+```
+
+<Warning>
+  **Queue configuration is critical.** Without a proper queue driver, scheduled messages will not be sent.
+</Warning>
+
+<CodeGroup>
+```bash Redis (Production)
+QUEUE_CONNECTION=redis
+```
+
+```bash Database (Fallback)
+QUEUE_CONNECTION=database
+```
+
+```bash Sync (Development Only)
+QUEUE_CONNECTION=sync
+```
+</CodeGroup>
+
+### Session Configuration
+
+```bash
+# Session driver: redis, database, file, cookie
+SESSION_DRIVER=redis
+
+# Session lifetime (minutes)
+SESSION_LIFETIME=120
+
+# Encrypt session data
+SESSION_ENCRYPT=false
+
+# Session cookie path
+SESSION_PATH=/
+
+# Session cookie domain
+SESSION_DOMAIN=null
+
+# Redis connection for sessions
+SESSION_STORE=redis
+```
+
+## Mail Configuration
+
+### SMTP Configuration
+
+```bash
+# Mail driver: smtp, log, mailgun, ses, postmark, sendmail
+MAIL_MAILER=smtp
+
+# SMTP server details
+MAIL_HOST=smtp.yourdomain.com
+MAIL_PORT=587
+MAIL_USERNAME=your_smtp_username
+MAIL_PASSWORD=your_smtp_password
+MAIL_ENCRYPTION=tls
+
+# From address
+MAIL_FROM_ADDRESS="noreply@yourdomain.com"
+MAIL_FROM_NAME="${APP_NAME}"
+```
+
+### Mail Service Examples
+
+<CodeGroup>
+```bash Gmail
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-app-password
+MAIL_ENCRYPTION=tls
+```
+
+```bash Mailjet
+MAIL_MAILER=mailjet
+MAILJET_APIKEY=your_api_key
+MAILJET_APISECRET=your_api_secret
+```
+
+```bash SendGrid
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.sendgrid.net
+MAIL_PORT=587
+MAIL_USERNAME=apikey
+MAIL_PASSWORD=your_sendgrid_api_key
+MAIL_ENCRYPTION=tls
+```
+
+```bash Development (Log)
+MAIL_MAILER=log
+```
+</CodeGroup>
+
+<Note>
+  Mail configuration is required for sending team collaboration invitations. In development, use `MAIL_MAILER=log` to log emails instead of sending them.
+</Note>
+
+## Optional Services
+
+### AI Content Generation
+
+Enable AI-powered message content generation:
+
+```bash
+# OpenAI Configuration
+OPENAI_API_KEY=sk-your-openai-api-key
+
+# Google Gemini Configuration  
+GEMINI_API_KEY=your-gemini-api-key
+```
+
+<Note>
+  You only need to configure one AI provider. Users with `can_use_ai` flag enabled can generate content automatically.
+</Note>
+
+### Analytics (Matomo)
+
+Optional analytics tracking:
+
+```bash
+# Matomo Tag Manager container URL
+VITE_MATOMO_CONTAINER_URL=https://your-matomo-instance.com/js/container_XXXXXX.js
+```
+
+### File Storage
+
+```bash
+# Filesystem disk: local, public, s3
+FILESYSTEM_DISK=local
+```
+
+For scheduled message attachments, files are stored in `storage/app/scheduled_messages/` by default.
+
+### AWS S3 (Optional)
+
+If using S3 for file storage:
+
+```bash
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=your_bucket_name
+AWS_USE_PATH_STYLE_ENDPOINT=false
+```
+
+## Security Settings
+
+### Password Hashing
+
+```bash
+# BCrypt rounds (higher = more secure, slower)
+BCRYPT_ROUNDS=12
+```
+
+### Maintenance Mode
+
+```bash
+# Maintenance mode driver: file, cache
+APP_MAINTENANCE_DRIVER=file
+
+# Optional: store maintenance state in database
+# APP_MAINTENANCE_STORE=database
+```
+
+## Performance Tuning
+
+### PHP Workers
+
+```bash
+# Number of PHP CLI server workers (development only)
+# PHP_CLI_SERVER_WORKERS=4
+```
+
+### Broadcasting
+
+```bash
+# Broadcast driver: log, pusher, ably, redis, null
+BROADCAST_CONNECTION=log
+```
+
+### Memcached (Alternative Cache)
+
+```bash
+MEMCACHED_HOST=127.0.0.1
+```
+
+## Frontend Configuration
+
+### Vite Variables
+
+```bash
+# Application name (available in React)
+VITE_APP_NAME="${APP_NAME}"
+
+# Matomo analytics (optional)
+VITE_MATOMO_CONTAINER_URL=
+```
+
+<Note>
+  Variables prefixed with `VITE_` are exposed to the frontend JavaScript code.
+</Note>
+
+## Production Configuration Example
+
+Here's a complete production `.env` example:
+
+```bash
+# Application
+APP_NAME=WebhookManager
+APP_ENV=production
+APP_KEY=base64:generated-key-here
+APP_DEBUG=false
+APP_URL=https://webhook.yourdomain.com
+
+APP_LOCALE=en
+APP_FALLBACK_LOCALE=en
+
+BCRYPT_ROUNDS=12
+
+# Logging
+LOG_CHANNEL=daily
+LOG_LEVEL=error
+LOG_DEPRECATIONS_CHANNEL=null
+
+# Database (PostgreSQL)
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=discord_webhook
+DB_USERNAME=webhook_user
+DB_PASSWORD=super_secure_password_here
+
+# Redis
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+REDIS_CACHE_CONNECTION=cache
+REDIS_QUEUE_CONNECTION=default
+
+# Cache & Queue
+CACHE_STORE=redis
+QUEUE_CONNECTION=redis
+
+# Sessions
+SESSION_DRIVER=redis
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_STORE=redis
+
+# Mail (SMTP)
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.yourdomain.com
+MAIL_PORT=587
+MAIL_USERNAME=noreply@yourdomain.com
+MAIL_PASSWORD=smtp_password_here
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS="noreply@yourdomain.com"
+MAIL_FROM_NAME="${APP_NAME}"
+
+# File Storage
+FILESYSTEM_DISK=local
+
+# Broadcasting
+BROADCAST_CONNECTION=log
+
+# Frontend
+VITE_APP_NAME="${APP_NAME}"
+
+# Optional: AI Content Generation
+# OPENAI_API_KEY=sk-your-key-here
+# GEMINI_API_KEY=your-key-here
+
+# Optional: Analytics
+# VITE_MATOMO_CONTAINER_URL=https://matomo.yourdomain.com/js/container_XXXXX.js
+```
+
+## Post-Configuration Steps
+
+After editing `.env`, run these commands:
+
+<Steps>
+  <Step title="Clear configuration cache">
+    ```bash
+    php artisan config:clear
+    ```
+  </Step>
+
+  <Step title="Cache configuration (production only)">
+    ```bash
+    php artisan config:cache
+    ```
+  </Step>
+
+  <Step title="Restart services">
+    ```bash
+    # Restart PHP-FPM
+    sudo systemctl restart php8.2-fpm
+
+    # Restart queue workers
+    sudo supervisorctl restart all
+    ```
+  </Step>
+</Steps>
+
+## Configuration Validation
+
+Verify your configuration:
+
+```bash
+# Check database connection
+php artisan migrate:status
+
+# Check Redis connection
+php artisan tinker
+>>> Cache::get('test')
+>>> exit
+
+# Check queue connection
+php artisan queue:monitor
+```
+
+## Security Best Practices
+
+<Warning>
+  Follow these security practices for production deployments:
+</Warning>
+
+1. **Use strong, unique passwords** for all services
+2. **Never set `APP_DEBUG=true`** in production
+3. **Keep `.env` file permissions restricted**:
+   ```bash
+   chmod 600 .env
+   chown www-data:www-data .env
+   ```
+4. **Use HTTPS** for `APP_URL`
+5. **Enable Redis password** if exposed to network
+6. **Regularly rotate API keys** and passwords
+7. **Backup `.env` file** securely (encrypted)
+
+## Troubleshooting
+
+### Configuration Cached
+
+If changes don't take effect:
+
+```bash
+php artisan config:clear
+php artisan cache:clear
+```
+
+### Environment Variables Not Loading
+
+Check file permissions:
+
+```bash
+ls -la .env
+# Should be readable by www-data
+```
+
+### Redis Connection Failed
+
+Verify Redis is running:
+
+```bash
+redis-cli ping
+sudo systemctl status redis-server
+```
+
+## Next Steps
+
+- [Setup Queue Workers and Scheduler](/deployment/worker-setup)
+- Review security hardening practices
+- Configure monitoring and backups

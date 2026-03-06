@@ -1,0 +1,238 @@
+---
+title: System Requirements
+description: Hardware and software requirements for deploying Discord Webhook Manager
+---
+
+Before deploying Discord Webhook Manager, ensure your server meets the following requirements.
+
+## Server Specifications
+
+### Minimum Requirements
+
+- **CPU**: 2 cores (2.0 GHz or higher)
+- **RAM**: 2 GB minimum, 4 GB recommended
+- **Storage**: 10 GB free disk space
+- **Network**: Stable internet connection with HTTPS support
+
+### Recommended for Production
+
+- **CPU**: 4 cores or more
+- **RAM**: 4-8 GB
+- **Storage**: 20 GB SSD
+- **OS**: Ubuntu 22.04 LTS or 24.04 LTS
+
+## Software Requirements
+
+### Required Software
+
+<Steps>
+  <Step title="Web Server">
+    **Nginx** (recommended) or Apache
+    
+    Nginx provides better performance for serving static assets and handling concurrent connections.
+  </Step>
+
+  <Step title="PHP 8.2+">
+    **PHP 8.2 or higher** with the following extensions:
+    
+    - BCMath
+    - Ctype
+    - Fileinfo
+    - JSON
+    - Mbstring
+    - OpenSSL
+    - PDO
+    - PDO_PgSQL (for PostgreSQL) or PDO_MySQL (for MySQL)
+    - Tokenizer
+    - XML
+    - Curl
+    - Zip
+    - Redis (php-redis extension)
+  </Step>
+
+  <Step title="Database">
+    **PostgreSQL 14+** or **MySQL 8.0+**
+    
+    <Note>
+      The application supports both PostgreSQL and MySQL. PostgreSQL is recommended for better JSON handling and performance.
+    </Note>
+  </Step>
+
+  <Step title="Redis">
+    **Redis 6.0+** for cache, sessions, and queue management
+    
+    Redis provides significant performance improvements over database-backed sessions and queues.
+  </Step>
+
+  <Step title="Node.js">
+    **Node.js 20+** and **npm** for building frontend assets
+  </Step>
+
+  <Step title="Composer">
+    **Composer 2.x** for PHP dependency management
+  </Step>
+
+  <Step title="Process Manager">
+    **Supervisor** for managing queue workers
+    
+    Essential for running background jobs that process scheduled messages.
+  </Step>
+</Steps>
+
+## System Tools
+
+Install these basic utilities:
+
+```bash
+sudo apt update
+sudo apt install -y git curl unzip zip
+```
+
+## PHP Extensions Verification
+
+After installing PHP, verify all required extensions are enabled:
+
+```bash
+php -m | grep -E "bcmath|ctype|fileinfo|json|mbstring|openssl|pdo|tokenizer|xml|curl|zip|redis"
+```
+
+You should see all the required extensions listed.
+
+## Database Requirements
+
+### PostgreSQL
+
+If using PostgreSQL:
+
+```bash
+# Check PostgreSQL version
+psql --version
+
+# Should be 14.0 or higher
+```
+
+### MySQL
+
+If using MySQL:
+
+```bash
+# Check MySQL version
+mysql --version
+
+# Should be 8.0 or higher
+```
+
+<Warning>
+  MySQL 5.7 and earlier versions are not supported due to missing features required by Laravel 12.
+</Warning>
+
+## Redis Requirements
+
+Redis is mandatory for optimal performance:
+
+```bash
+# Check Redis is installed and running
+redis-cli ping
+# Should respond: PONG
+
+# Check Redis version
+redis-server --version
+# Should be 6.0 or higher
+```
+
+## Port Requirements
+
+Ensure these ports are available:
+
+- **80**: HTTP traffic (will redirect to HTTPS)
+- **443**: HTTPS traffic (required for production)
+- **5432**: PostgreSQL (if using PostgreSQL)
+- **3306**: MySQL (if using MySQL)
+- **6379**: Redis (localhost only)
+
+## Storage Requirements
+
+### Directory Permissions
+
+The following directories must be writable by the web server user (`www-data`):
+
+- `storage/`
+- `storage/logs/`
+- `storage/framework/`
+- `storage/framework/cache/`
+- `storage/framework/sessions/`
+- `storage/framework/views/`
+- `storage/app/scheduled_messages/` (for file attachments)
+- `bootstrap/cache/`
+
+### File Upload Limits
+
+The application allows file uploads up to 10MB for scheduled message attachments. Configure PHP accordingly:
+
+```ini
+# In php.ini
+upload_max_filesize = 10M
+post_max_size = 10M
+memory_limit = 256M
+```
+
+## SSL Certificate
+
+<Warning>
+  HTTPS is **required** for production deployments. Discord webhooks work over HTTP but using HTTPS is a security best practice.
+</Warning>
+
+Recommended options:
+- **Let's Encrypt** (free, automated)
+- **Cloudflare** (free with CDN)
+- Commercial SSL certificate
+
+## Email Service
+
+For sending team invitation emails, you need:
+
+- SMTP server credentials, **OR**
+- Third-party email service (Mailjet, SendGrid, etc.)
+
+<Note>
+  The application includes Mailjet integration by default. You can configure any SMTP service in the `.env` file.
+</Note>
+
+## Optional Services
+
+### AI Content Generation
+
+If you want to enable AI-powered content generation:
+
+- **OpenAI API Key** (for GPT models), **OR**
+- **Google Gemini API Key**
+
+### Analytics
+
+For tracking user behavior:
+
+- **Matomo** instance with Tag Manager
+
+## Pre-Installation Checklist
+
+Before proceeding to installation, verify:
+
+- [ ] Ubuntu 22.04/24.04 server with root/sudo access
+- [ ] PHP 8.2+ with all required extensions
+- [ ] PostgreSQL 14+ or MySQL 8.0+ installed
+- [ ] Redis 6.0+ installed and running
+- [ ] Node.js 20+ and npm installed
+- [ ] Composer 2.x installed
+- [ ] Supervisor installed
+- [ ] Domain name configured (for production)
+- [ ] SSL certificate ready (for production)
+- [ ] SMTP credentials available
+- [ ] Minimum 2GB RAM available
+- [ ] 10GB+ free disk space
+
+## Next Steps
+
+Once your system meets all requirements, proceed to:
+
+- [Ubuntu Server Deployment Guide](/deployment/ubuntu-server)
+- [Environment Configuration](/deployment/configuration)

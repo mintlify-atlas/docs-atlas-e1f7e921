@@ -1,0 +1,472 @@
+---
+title: 'Webhooks API'
+description: 'Create, manage, and validate Discord webhooks'
+icon: 'webhook'
+---
+
+## Overview
+
+The Webhooks API allows you to manage Discord webhook integrations. All endpoints require authentication and follow RESTful conventions.
+
+## List All Webhooks
+
+<CodeGroup>
+```bash cURL
+curl -X GET https://your-domain.com/webhooks \
+  -H "Accept: application/json" \
+  -H "X-CSRF-TOKEN: your-csrf-token" \
+  --cookie "session-cookie"
+```
+
+```javascript Fetch
+fetch('/webhooks', {
+  method: 'GET',
+  headers: {
+    'Accept': 'application/json',
+    'X-CSRF-TOKEN': csrfToken
+  },
+  credentials: 'include'
+})
+```
+</CodeGroup>
+
+**GET** `/webhooks`
+
+Retrieves all webhooks owned by or shared with the authenticated user.
+
+### Query Parameters
+
+<ParamField query="ownership" type="string">
+  Filter by ownership: `owned`, `shared`, or `all`
+</ParamField>
+
+### Response
+
+<ResponseField name="webhooks" type="array">
+  Array of webhook objects
+  
+  <ResponseField name="id" type="integer">
+    Unique webhook identifier
+  </ResponseField>
+  
+  <ResponseField name="name" type="string">
+    Webhook display name
+  </ResponseField>
+  
+  <ResponseField name="webhook_url" type="string">
+    Discord webhook URL (masked in responses)
+  </ResponseField>
+  
+  <ResponseField name="avatar_url" type="string">
+    Webhook avatar URL
+  </ResponseField>
+  
+  <ResponseField name="description" type="string">
+    Webhook description
+  </ResponseField>
+  
+  <ResponseField name="guild_id" type="string">
+    Discord server (guild) ID
+  </ResponseField>
+  
+  <ResponseField name="channel_id" type="string">
+    Discord channel ID
+  </ResponseField>
+  
+  <ResponseField name="tags" type="array">
+    Array of tag strings
+  </ResponseField>
+  
+  <ResponseField name="is_owner" type="boolean">
+    Whether current user owns this webhook
+  </ResponseField>
+  
+  <ResponseField name="permission_level" type="string">
+    User's permission: `owner`, `edit`, `send`, or `view`
+  </ResponseField>
+  
+  <ResponseField name="message_history_count" type="integer">
+    Total messages sent through this webhook
+  </ResponseField>
+</ResponseField>
+
+```json Response Example
+{
+  "webhooks": [
+    {
+      "id": 1,
+      "name": "Server Updates",
+      "webhook_url": "https://discord.com/api/webhooks/***",
+      "avatar_url": "https://cdn.discordapp.com/avatars/...",
+      "description": "Automated server status updates",
+      "guild_id": "123456789",
+      "channel_id": "987654321",
+      "tags": ["production", "alerts"],
+      "is_owner": true,
+      "permission_level": "owner",
+      "message_history_count": 42,
+      "created_at": "2024-01-15T10:30:00.000000Z",
+      "updated_at": "2024-01-15T10:30:00.000000Z"
+    }
+  ]
+}
+```
+
+---
+
+## Create Webhook
+
+**POST** `/webhooks`
+
+Creates a new webhook after validating it with Discord's API.
+
+### Request Body
+
+<ParamField body="webhook_url" type="string" required>
+  Discord webhook URL. Must start with `https://discord.com/api/webhooks/` or `https://discordapp.com/api/webhooks/`
+</ParamField>
+
+<ParamField body="name" type="string">
+  Webhook name (auto-filled from Discord if not provided)
+</ParamField>
+
+<ParamField body="avatar_url" type="string">
+  Avatar URL (auto-filled from Discord if not provided)
+</ParamField>
+
+<ParamField body="description" type="string">
+  Webhook description (max 1000 characters)
+</ParamField>
+
+<ParamField body="tags" type="array">
+  Array of tag strings (max 50 characters each)
+</ParamField>
+
+<CodeGroup>
+```json Request
+{
+  "webhook_url": "https://discord.com/api/webhooks/123456789/abcdefg",
+  "name": "Production Alerts",
+  "description": "Critical production notifications",
+  "tags": ["production", "alerts", "critical"]
+}
+```
+
+```javascript Fetch
+fetch('/webhooks', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-CSRF-TOKEN': csrfToken
+  },
+  credentials: 'include',
+  body: JSON.stringify({
+    webhook_url: 'https://discord.com/api/webhooks/123456789/abcdefg',
+    name: 'Production Alerts',
+    description: 'Critical production notifications',
+    tags: ['production', 'alerts']
+  })
+})
+```
+</CodeGroup>
+
+### Response
+
+Returns `302` redirect to `/webhooks` with success message.
+
+---
+
+## Get Webhook Details
+
+**GET** `/webhooks/{id}`
+
+Retrieve detailed information about a specific webhook.
+
+### Path Parameters
+
+<ParamField path="id" type="integer" required>
+  Webhook ID
+</ParamField>
+
+### Response
+
+<ResponseField name="webhook" type="object">
+  Webhook details with statistics
+</ResponseField>
+
+<ResponseField name="stats" type="object">
+  Message statistics
+  
+  <ResponseField name="total" type="integer">
+    Total messages sent
+  </ResponseField>
+  
+  <ResponseField name="success" type="integer">
+    Successful messages
+  </ResponseField>
+  
+  <ResponseField name="error" type="integer">
+    Failed messages
+  </ResponseField>
+  
+  <ResponseField name="recent" type="integer">
+    Messages in last 7 days
+  </ResponseField>
+</ResponseField>
+
+```json Response
+{
+  "webhook": {
+    "id": 1,
+    "name": "Server Updates",
+    "webhook_url": "https://discord.com/api/webhooks/***",
+    "description": "Automated server updates",
+    "guild_id": "123456789",
+    "channel_id": "987654321",
+    "is_owner": true,
+    "permission_level": "owner",
+    "message_history": [
+      // Recent 10 messages
+    ]
+  },
+  "stats": {
+    "total": 150,
+    "success": 148,
+    "error": 2,
+    "recent": 25
+  }
+}
+```
+
+---
+
+## Update Webhook
+
+**PUT/PATCH** `/webhooks/{id}`
+
+Update webhook details. If webhook URL is changed, it will be validated with Discord.
+
+### Path Parameters
+
+<ParamField path="id" type="integer" required>
+  Webhook ID
+</ParamField>
+
+### Request Body
+
+<ParamField body="webhook_url" type="string" required>
+  Discord webhook URL
+</ParamField>
+
+<ParamField body="name" type="string">
+  Webhook name
+</ParamField>
+
+<ParamField body="avatar_url" type="string">
+  Avatar URL
+</ParamField>
+
+<ParamField body="description" type="string">
+  Description (max 1000 characters)
+</ParamField>
+
+<ParamField body="tags" type="array">
+  Array of tags
+</ParamField>
+
+<CodeGroup>
+```json Request
+{
+  "webhook_url": "https://discord.com/api/webhooks/123456789/abcdefg",
+  "name": "Updated Name",
+  "description": "Updated description",
+  "tags": ["updated", "production"]
+}
+```
+</CodeGroup>
+
+---
+
+## Delete Webhook
+
+**DELETE** `/webhooks/{id}`
+
+Permanently delete a webhook. Only the owner can delete a webhook.
+
+### Path Parameters
+
+<ParamField path="id" type="integer" required>
+  Webhook ID
+</ParamField>
+
+### Response
+
+Returns `302` redirect to `/webhooks` with success message.
+
+---
+
+## Validate Webhook URL
+
+**POST** `/webhooks/validate`
+
+Validate a Discord webhook URL with Discord's API before saving.
+
+### Request Body
+
+<ParamField body="webhook_url" type="string" required>
+  Discord webhook URL to validate
+</ParamField>
+
+<CodeGroup>
+```json Request
+{
+  "webhook_url": "https://discord.com/api/webhooks/123456789/abcdefg"
+}
+```
+
+```bash cURL
+curl -X POST https://your-domain.com/webhooks/validate \
+  -H "Content-Type: application/json" \
+  -H "X-CSRF-TOKEN: your-csrf-token" \
+  --cookie "session-cookie" \
+  -d '{"webhook_url":"https://discord.com/api/webhooks/123456789/abcdefg"}'
+```
+</CodeGroup>
+
+### Response
+
+<ResponseField name="success" type="boolean">
+  Whether validation succeeded
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Discord webhook metadata
+  
+  <ResponseField name="name" type="string">
+    Webhook name from Discord
+  </ResponseField>
+  
+  <ResponseField name="avatar_url" type="string">
+    Webhook avatar URL from Discord
+  </ResponseField>
+  
+  <ResponseField name="guild_id" type="string">
+    Discord server ID
+  </ResponseField>
+  
+  <ResponseField name="channel_id" type="string">
+    Discord channel ID
+  </ResponseField>
+</ResponseField>
+
+```json Success Response
+{
+  "success": true,
+  "data": {
+    "name": "Captain Hook",
+    "avatar_url": "https://cdn.discordapp.com/avatars/...",
+    "guild_id": "123456789",
+    "channel_id": "987654321"
+  }
+}
+```
+
+```json Error Response
+{
+  "success": false,
+  "message": "Invalid Discord webhook URL or webhook no longer exists."
+}
+```
+
+---
+
+## Get Message History
+
+**GET** `/webhooks/{id}/history`
+
+Retrieve message history for a webhook with pagination.
+
+### Path Parameters
+
+<ParamField path="id" type="integer" required>
+  Webhook ID
+</ParamField>
+
+### Query Parameters
+
+<ParamField query="page" type="integer" default="1">
+  Page number
+</ParamField>
+
+### Response
+
+<ResponseField name="messages" type="object">
+  Paginated message history
+  
+  <ResponseField name="data" type="array">
+    Array of message objects
+  </ResponseField>
+  
+  <ResponseField name="current_page" type="integer">
+    Current page number
+  </ResponseField>
+  
+  <ResponseField name="per_page" type="integer">
+    Items per page (20)
+  </ResponseField>
+  
+  <ResponseField name="total" type="integer">
+    Total number of messages
+  </ResponseField>
+</ResponseField>
+
+```json Response
+{
+  "messages": {
+    "data": [
+      {
+        "id": 1,
+        "user_id": 1,
+        "webhook_id": 1,
+        "message_content": {
+          "content": "Hello Discord!",
+          "embeds": []
+        },
+        "status": "success",
+        "sent_at": "2024-01-15T10:30:00.000000Z",
+        "user": {
+          "id": 1,
+          "name": "John Doe"
+        }
+      }
+    ],
+    "current_page": 1,
+    "per_page": 20,
+    "total": 150
+  }
+}
+```
+
+---
+
+## Authorization
+
+Webhook operations require specific permissions:
+
+| Operation | Permission Required |
+|-----------|--------------------|
+| List | Any (shows owned + shared) |
+| View | `view`, `send`, `edit`, or `owner` |
+| Create | Authenticated user |
+| Update | `edit` or `owner` |
+| Delete | `owner` only |
+| Send | `send`, `edit`, or `owner` |
+
+## Error Codes
+
+| Code | Description |
+|------|-------------|
+| 401 | Not authenticated |
+| 403 | Insufficient permissions |
+| 404 | Webhook not found |
+| 422 | Validation error (invalid Discord URL, etc.) |

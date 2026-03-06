@@ -1,0 +1,764 @@
+---
+title: 'Scheduled Messages'
+description: 'Schedule one-time and recurring Discord messages with file attachments and timezone support'
+icon: 'clock'
+---
+
+## Overview
+
+Scheduled Messages enable you to automate Discord message delivery with precise timing control. Schedule one-time messages for specific dates or create recurring messages that send daily, weekly, or monthly. The system handles timezone conversions, file attachments, and automatic cleanup.
+
+## Creating Scheduled Messages
+
+<Steps>
+  <Step title="Navigate to Scheduled Messages">
+    Click "Scheduled" in the sidebar menu.
+  </Step>
+  
+  <Step title="Click New Scheduled Message">
+    Click the "Schedule Message" button to open the scheduler.
+  </Step>
+  
+  <Step title="Select Webhook">
+    Choose which webhook will send the message:
+    
+    <ParamField path="webhook_id" type="integer" required>
+      Select from your saved webhooks or shared webhooks where you have send permissions.
+    </ParamField>
+    
+    You can only schedule messages for webhooks you own or have editor/admin access to.
+  </Step>
+  
+  <Step title="Choose Schedule Type">
+    Select between one-time or recurring delivery:
+    
+    <Tabs>
+      <Tab title="One-Time">
+        Send the message once at a specific date and time.
+        
+        <ParamField path="scheduled_at" type="datetime" required>
+          Select the exact date and time for delivery.
+          
+          Uses your selected timezone for scheduling.
+        </ParamField>
+        
+        **Use cases**:
+        - Event announcements
+        - Deadline reminders
+        - Scheduled releases
+        - One-off notifications
+      </Tab>
+      
+      <Tab title="Recurring">
+        Send the message repeatedly on a schedule.
+        
+        <ParamField path="recurrence_pattern" type="object" required>
+          Configure the recurrence schedule:
+          
+          **Frequency Options**:
+          - Daily: Every day at a specific time
+          - Weekly: Specific days of the week
+          - Monthly: Specific day of the month
+        </ParamField>
+        
+        <ParamField path="max_sends" type="integer">
+          Optional limit on total sends.
+          
+          Leave empty for unlimited recurring sends.
+        </ParamField>
+        
+        **Use cases**:
+        - Daily reports
+        - Weekly summaries
+        - Monthly reminders
+        - Regular announcements
+      </Tab>
+    </Tabs>
+  </Step>
+  
+  <Step title="Configure Recurrence (Recurring Only)">
+    For recurring messages, set the pattern:
+    
+    <Tabs>
+      <Tab title="Daily">
+        ```json
+        {
+          "frequency": "daily",
+          "time": "09:00"
+        }
+        ```
+        
+        Sends every day at 9:00 AM in your selected timezone.
+      </Tab>
+      
+      <Tab title="Weekly">
+        ```json
+        {
+          "frequency": "weekly",
+          "time": "14:00",
+          "days": [1, 3, 5]
+        }
+        ```
+        
+        Sends on Monday, Wednesday, and Friday at 2:00 PM.
+        
+        **Day numbers**: 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      </Tab>
+      
+      <Tab title="Monthly">
+        ```json
+        {
+          "frequency": "monthly",
+          "time": "12:00",
+          "day": 1
+        }
+        ```
+        
+        Sends on the 1st of each month at noon.
+        
+        **Day range**: 1-31 (handles short months automatically)
+      </Tab>
+    </Tabs>
+  </Step>
+  
+  <Step title="Set Timezone">
+    <ParamField path="timezone" type="string" required>
+      Select your timezone for accurate scheduling.
+      
+      Default: Europe/Madrid
+    </ParamField>
+    
+    The system converts your local time to UTC for storage and converts back for display.
+    
+    <Note>
+      All schedule calculations respect your timezone, including daylight saving time changes.
+    </Note>
+  </Step>
+  
+  <Step title="Compose Message">
+    Design your message using the full editor:
+    - Message content (max 2000 characters)
+    - Embeds (up to 10)
+    - Files (up to 10, 10MB each)
+    - Dynamic variables
+    
+    Or load from a template:
+    <ParamField path="template_id" type="integer">
+      Optional template to load content from.
+      
+      Template content is copied, so future template changes won't affect this scheduled message.
+    </ParamField>
+  </Step>
+  
+  <Step title="Attach Files (Optional)">
+    Upload files to include with the message:
+    
+    **Supported formats**:
+    - Images: jpg, jpeg, png, gif, webp
+    - Videos: mp4, mov, avi
+    
+    **Important file handling**:
+    - Files are stored in `storage/app/scheduled_messages/{id}/`
+    - Files are automatically deleted after successful sending
+    - This saves storage space and maintains privacy
+    
+    <Warning>
+      Files are permanently deleted after sending. Upload files again if you need to resend.
+    </Warning>
+  </Step>
+  
+  <Step title="Review & Schedule">
+    Review all details:
+    - Next send time (in your timezone)
+    - Recurrence pattern (if applicable)
+    - Message preview
+    - Attached files
+    
+    Click "Schedule" to activate the scheduled message.
+  </Step>
+</Steps>
+
+## Scheduled Message States
+
+Messages progress through different states:
+
+<Tabs>
+  <Tab title="Pending">
+    **Status**: `pending`
+    
+    The message is scheduled and waiting for its send time.
+    
+    **Characteristics**:
+    - Appears in active schedules list
+    - Shows next send time
+    - Can be edited, paused, or deleted
+    - Will be processed when `next_send_at` arrives
+  </Tab>
+  
+  <Tab title="Processing">
+    **Status**: `processing`
+    
+    The message is currently being sent to Discord.
+    
+    **Characteristics**:
+    - Brief transitional state
+    - Cannot be modified during processing
+    - Usually completes in seconds
+    - Moves to completed or failed after sending
+  </Tab>
+  
+  <Tab title="Completed">
+    **Status**: `completed`
+    
+    The message has been successfully sent.
+    
+    **For one-time messages**:
+    - Single send completed
+    - No further sends scheduled
+    - Can be viewed in history
+    
+    **For recurring messages**:
+    - All sends completed (reached max_sends)
+    - OR manually marked as completed
+  </Tab>
+  
+  <Tab title="Failed">
+    **Status**: `failed`
+    
+    The send attempt failed.
+    
+    **Common reasons**:
+    - Invalid webhook URL
+    - Webhook deleted in Discord
+    - Permission issues
+    - Discord API errors
+    - Network connectivity issues
+    
+    **Error message** stored for debugging.
+    
+    <Note>
+      Failed recurring messages do not retry automatically. Review the error, fix the issue, and resume or recreate the schedule.
+    </Note>
+  </Tab>
+  
+  <Tab title="Paused">
+    **Status**: `paused`
+    
+    Recurring message temporarily paused.
+    
+    **Characteristics**:
+    - Only available for recurring messages
+    - No sends occur while paused
+    - Can be resumed at any time
+    - Next send time recalculated on resume
+    
+    **Use cases**:
+    - Temporary suspension during holidays
+    - Maintenance windows
+    - Testing periods
+  </Tab>
+</Tabs>
+
+## Managing Scheduled Messages
+
+### Viewing Schedules
+
+The scheduled messages dashboard shows:
+
+**List View**:
+- Message preview (first 100 characters)
+- Associated webhook
+- Schedule type (one-time/recurring)
+- Next send time
+- Status badge
+- Send count (for recurring)
+- Quick actions
+
+**Filters**:
+- **By Status**: pending, processing, completed, failed, paused, all
+- **By Type**: one-time, recurring, all
+- **By Webhook**: filter by specific webhook
+- **Date Range**: filter by scheduled date
+
+### Editing Schedules
+
+<Warning>
+  You can only edit messages that haven't been sent yet (`send_count = 0`).
+</Warning>
+
+<Steps>
+  <Step title="Select Message">
+    Click on the scheduled message in your dashboard.
+  </Step>
+  
+  <Step title="Click Edit">
+    Open the edit form (only available if not yet sent).
+  </Step>
+  
+  <Step title="Modify Settings">
+    Update any of:
+    - Message content
+    - Embeds
+    - Schedule time/pattern
+    - Timezone
+    - Attached files
+  </Step>
+  
+  <Step title="Save Changes">
+    The next send time is recalculated based on your changes.
+  </Step>
+</Steps>
+
+### Pausing & Resuming
+
+For recurring messages:
+
+**To Pause**:
+1. Click the pause icon/button
+2. Message status changes to "paused"
+3. No sends occur while paused
+4. Current progress preserved
+
+**To Resume**:
+1. Click the resume icon/button  
+2. Status returns to "pending"
+3. Next send time is recalculated from current time
+4. Sends resume on schedule
+
+<Note>
+  Pausing does not reset the send count. If a message has sent 5 times before pausing, it continues from 5 when resumed.
+</Note>
+
+### Deleting Schedules
+
+<Warning>
+  Deleting a scheduled message:
+  - Removes the schedule permanently
+  - Deletes all associated files
+  - Cannot be undone
+  - Does not affect messages already sent
+</Warning>
+
+Only the message creator or webhook owner can delete scheduled messages.
+
+## How It Works
+
+### Processing Pipeline
+
+The system uses Laravel's scheduler and queue system:
+
+<Steps>
+  <Step title="Cron Trigger">
+    Server cron runs every minute:
+    ```bash
+    * * * * * php /path/to/artisan schedule:run
+    ```
+  </Step>
+  
+  <Step title="Scheduler Check">
+    Laravel Scheduler executes the command:
+    ```bash
+    php artisan scheduled-messages:process
+    ```
+    
+    This runs every minute to check for due messages.
+  </Step>
+  
+  <Step title="Query Due Messages">
+    Command finds messages where:
+    ```sql
+    WHERE status = 'pending'
+      AND next_send_at <= NOW()
+    ```
+  </Step>
+  
+  <Step title="Queue Jobs">
+    For each due message, dispatch job:
+    ```php
+    SendScheduledMessage::dispatch($scheduledMessage)
+    ```
+    
+    Jobs are queued for async processing.
+  </Step>
+  
+  <Step title="Worker Processing">
+    Queue worker processes the job:
+    - Marks message as "processing"
+    - Loads message content and files
+    - Sends to Discord API via webhook
+    - Handles response
+  </Step>
+  
+  <Step title="Post-Send Actions">
+    Based on result:
+    
+    **Success**:
+    - Increment `send_count`
+    - For one-time: Mark as "completed"
+    - For recurring: Calculate next send time
+    - Delete attached files
+    - Log in webhook history
+    
+    **Failure**:
+    - Mark as "failed"
+    - Store error message
+    - Delete files
+    - Notify user (if configured)
+  </Step>
+</Steps>
+
+### Timezone Handling
+
+The system handles timezones carefully:
+
+1. **User Input**: You select times in your timezone
+2. **Storage**: Times converted to UTC in database
+3. **Calculation**: Next send times calculated in your timezone
+4. **Display**: Times shown in your timezone
+5. **Processing**: UTC times used for comparisons
+
+**Example**:
+```
+User timezone: America/New_York (UTC-5)
+User selects: 09:00 AM daily
+
+Stored in DB: 14:00 UTC
+Next calculation: Uses America/New_York to determine 09:00 AM
+Display to user: 09:00 AM EST/EDT
+```
+
+### File Handling
+
+Files are managed automatically:
+
+**Upload**:
+```
+storage/app/scheduled_messages/{message_id}/{filename}
+```
+
+**Storage**:
+- Original filename preserved
+- MIME type detected
+- File size recorded
+- Path stored in database
+
+**Sending**:
+- Files sent as multipart/form-data
+- Discord receives files as attachments
+- Supports up to 10 files per message
+
+**Cleanup**:
+```php
+// After successful send
+foreach ($scheduledMessage->files as $file) {
+    Storage::delete($file->stored_path);
+    $file->delete();
+}
+```
+
+<Note>
+  Files are deleted immediately after sending to save storage space. This is by design.
+</Note>
+
+## Recurrence Patterns
+
+### Daily Recurrence
+
+**Configuration**:
+```json
+{
+  "frequency": "daily",
+  "time": "09:00"
+}
+```
+
+**Next Send Calculation**:
+1. Get current time in user's timezone
+2. Set time to 09:00
+3. If that time has passed today, add 1 day
+4. Convert to UTC for storage
+
+**Example Timeline**:
+- Today: March 6, 2026 at 09:00
+- Next: March 7, 2026 at 09:00
+- Then: March 8, 2026 at 09:00
+- Continues daily indefinitely (or until max_sends)
+
+### Weekly Recurrence
+
+**Configuration**:
+```json
+{
+  "frequency": "weekly",
+  "time": "14:00",
+  "days": [1, 3, 5]
+}
+```
+
+**Next Send Calculation**:
+1. Get current time in user's timezone
+2. Check next 7 days for matching day of week
+3. Find first match after current time
+4. Set time to 14:00
+5. Convert to UTC
+
+**Example Timeline** (starting Wednesday):
+- Wednesday at 14:00 (day 3)
+- Friday at 14:00 (day 5)  
+- Monday at 14:00 (day 1)
+- Wednesday at 14:00 (day 3)
+- Continues weekly cycle
+
+### Monthly Recurrence
+
+**Configuration**:
+```json
+{
+  "frequency": "monthly",
+  "time": "12:00",
+  "day": 1
+}
+```
+
+**Next Send Calculation**:
+1. Get current time in user's timezone
+2. Set day of month to 1
+3. Set time to 12:00
+4. If that time has passed this month, move to next month
+5. Handle short months (day 31 in February → March 3)
+6. Convert to UTC
+
+**Example Timeline**:
+- April 1, 2026 at 12:00
+- May 1, 2026 at 12:00
+- June 1, 2026 at 12:00
+- Continues on the 1st of each month
+
+## Send Count & Limits
+
+### Send Count Tracking
+
+For all scheduled messages:
+```php
+$scheduledMessage->send_count; // Number of times sent
+```
+
+Incremented after each successful send.
+
+### Maximum Sends
+
+For recurring messages, optionally limit total sends:
+
+```json
+{
+  "max_sends": 10
+}
+```
+
+**Behavior**:
+- Message sends up to 10 times
+- On 10th send, marked as "completed"
+- No further sends occur
+- Useful for limited campaigns
+
+**Unlimited Sends**:
+- Leave `max_sends` empty or null
+- Message continues indefinitely
+- Must be manually paused or deleted
+- Common for ongoing automation
+
+## Error Handling
+
+When a send fails:
+
+### Error Recording
+
+```php
+$scheduledMessage->update([
+    'status' => 'failed',
+    'error_message' => $errorDetails
+]);
+```
+
+### Common Errors
+
+<Tabs>
+  <Tab title="Invalid Webhook">
+    **Error**: "Invalid webhook URL or webhook no longer exists"
+    
+    **Cause**: Webhook deleted in Discord or URL malformed
+    
+    **Solution**:
+    - Update webhook URL
+    - Verify webhook exists in Discord
+    - Check webhook permissions
+  </Tab>
+  
+  <Tab title="Permission Denied">
+    **Error**: "Missing permissions"
+    
+    **Cause**: Webhook lacks permission to post in channel
+    
+    **Solution**:
+    - Check Discord channel permissions
+    - Verify webhook has send message permission
+    - Ensure channel wasn't deleted
+  </Tab>
+  
+  <Tab title="Rate Limited">
+    **Error**: "Rate limit exceeded"
+    
+    **Cause**: Too many messages sent too quickly
+    
+    **Solution**:
+    - Space out scheduled messages
+    - Use different webhooks
+    - Wait for rate limit to reset
+  </Tab>
+  
+  <Tab title="File Too Large">
+    **Error**: "File size exceeds limit"
+    
+    **Cause**: Attached file over 10MB
+    
+    **Solution**:
+    - Compress images/videos
+    - Split into multiple messages
+    - Use external hosting and link instead
+  </Tab>
+  
+  <Tab title="Content Validation">
+    **Error**: "Invalid request body"
+    
+    **Cause**: Message exceeds Discord limits
+    
+    **Solution**:
+    - Check character limits
+    - Verify embed count (max 10)
+    - Ensure field count (max 25 per embed)
+  </Tab>
+</Tabs>
+
+### Retry Strategy
+
+<Warning>
+  Failed scheduled messages do NOT retry automatically.
+</Warning>
+
+Manual intervention required:
+1. Review error message
+2. Fix the underlying issue
+3. Either:
+   - Edit and resume the schedule
+   - Delete and recreate
+   - Manually resend via webhook
+
+## Admin Features
+
+Administrators have additional capabilities:
+
+### Global Message View
+
+Admins can see all scheduled messages from all users:
+
+**Advanced Filters**:
+- By user (all users visible)
+- By webhook (across all users)
+- By status
+- By date range
+- By type
+
+**Statistics Dashboard**:
+- Total active schedules
+- Total paused schedules
+- Total completed today
+- Failed messages requiring attention
+- Per-user breakdown
+
+### Admin Actions
+
+Admins can manage any scheduled message:
+- Pause/resume any user's messages
+- Delete problematic schedules
+- View full message content
+- See error details
+- Access file attachments
+
+<Note>
+  Admin access is tracked in audit logs for security.
+</Note>
+
+## Best Practices
+
+### Scheduling
+
+1. **Test First**: Send manually before scheduling
+2. **Use Templates**: Create templates for recurring messages
+3. **Set Realistic Times**: Consider your audience's timezone
+4. **Limit Frequency**: Don't spam channels with too-frequent messages
+5. **Monitor First Sends**: Watch the first few sends to catch issues
+
+### Message Design
+
+1. **Keep it Concise**: Scheduled messages should be clear and brief
+2. **Use Variables**: Make messages dynamic with date/time variables
+3. **Include Context**: Mention that it's an automated message if relevant
+4. **Test Embeds**: Verify embeds render correctly in Discord
+5. **Optimize Files**: Compress images/videos to reduce send time
+
+### Maintenance
+
+1. **Regular Review**: Check scheduled messages weekly
+2. **Clean Up Completed**: Archive or delete old completed schedules
+3. **Monitor Failures**: Address failed messages promptly
+4. **Update Content**: Keep recurring messages fresh and relevant
+5. **Audit Permissions**: Ensure you still have access to webhooks
+
+### File Attachments
+
+1. **Mind the Size**: Keep files under 8MB for reliable delivery
+2. **Test Formats**: Verify file types work in Discord
+3. **Consider Hosting**: For large media, host externally and link
+4. **File Naming**: Use clear, descriptive filenames
+5. **Regular Content**: Don't use attachments for daily recurring (use links instead)
+
+## Troubleshooting
+
+### Message Not Sending
+
+1. Check message status (should be "pending")
+2. Verify `next_send_at` time hasn't passed
+3. Ensure webhook still exists and is valid
+4. Check server cron is running every minute
+5. Verify queue worker is processing jobs
+6. Review application logs for errors
+
+### Wrong Send Time
+
+1. Verify timezone setting matches your location
+2. Check for daylight saving time changes
+3. Ensure server time is correct (UTC)
+4. Review `next_send_at` in database (stored as UTC)
+5. Recalculate by editing and saving
+
+### Files Not Attaching
+
+1. Check files exist in storage before send time
+2. Verify file sizes under 10MB
+3. Ensure supported format (jpg, png, gif, webp, mp4, mov, avi)
+4. Check storage permissions
+5. Review disk space availability
+
+### Recurring Not Continuing
+
+1. Check status (should be "pending" not "completed")
+2. Verify `max_sends` not reached
+3. Ensure pattern is valid
+4. Check for errors in last send
+5. Review `next_send_at` calculation
+
+## Related Features
+
+- [Webhooks](/features/webhooks) - Manage webhooks for scheduled messages
+- [Templates](/features/templates) - Create reusable content for scheduling
+- [Message Editor](/features/message-editor) - Design message content

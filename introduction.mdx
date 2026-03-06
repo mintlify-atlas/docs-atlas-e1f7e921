@@ -1,0 +1,297 @@
+---
+title: "Introduction"
+description: "Welcome to Discord Webhook Manager - A powerful platform for managing, scheduling, and automating Discord webhooks with team collaboration and AI-powered features."
+---
+
+## What is Discord Webhook Manager?
+
+Discord Webhook Manager is a modern web application built with Laravel and React that provides a comprehensive solution for managing Discord webhooks. Whether you're managing community announcements, automated notifications, or team communications, this platform offers professional-grade tools to streamline your Discord messaging workflow.
+
+<CardGroup cols={2}>
+  <Card title="Visual Message Editor" icon="palette">
+    Design rich Discord messages with embeds, colors, and mentions using a real-time preview that matches Discord exactly.
+  </Card>
+  <Card title="Smart Scheduling" icon="clock">
+    Schedule one-time or recurring messages with timezone support and automatic file cleanup.
+  </Card>
+  <Card title="Team Collaboration" icon="users">
+    Share webhooks with role-based permissions: Admin, Editor, or Viewer access levels.
+  </Card>
+  <Card title="AI-Powered Content" icon="sparkles">
+    Generate message content automatically with OpenAI GPT or Google Gemini integration.
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Webhook Management
+
+Create and organize your Discord webhooks with powerful management features:
+
+- **Automatic validation** with Discord API
+- **Auto-detection** of webhook name and avatar from Discord
+- **Duplicate detection** to prevent accidental duplicates
+- **Metadata tracking** including guild ID and channel ID
+- **Custom avatars** via URL
+- **Tagging system** for organization
+
+### Advanced Message Editor
+
+Design professional Discord messages with a visual editor that includes:
+
+<AccordionGroup>
+  <Accordion title="Rich Text Content" icon="text">
+    Create message content up to 2,000 characters with full Discord markdown support and mention capabilities (@users, @roles, @everyone).
+  </Accordion>
+  
+  <Accordion title="Custom Embeds" icon="message">
+    Add up to 10 embeds per message with:
+    - Title (256 characters) with optional URL
+    - Description (4,096 characters)
+    - Custom color picker
+    - Author information with icon
+    - Footer with timestamp
+    - Images and thumbnails
+    - Custom fields (inline supported)
+  </Accordion>
+  
+  <Accordion title="Two Sending Modes" icon="paper-plane">
+    **Saved Webhook Mode**: Select from your saved webhooks with dropdown preview
+    
+    **Temporary Webhook Mode**: Use any Discord webhook URL directly without saving, with customizable name and avatar
+  </Accordion>
+  
+  <Accordion title="Real-Time Preview" icon="eye">
+    See exactly how your message will appear in Discord before sending, with pixel-perfect rendering.
+  </Accordion>
+</AccordionGroup>
+
+### Message Scheduling & Automation
+
+Automate your Discord communications with flexible scheduling:
+
+<Steps>
+  <Step title="Schedule Type">
+    Choose between **one-time** messages for specific dates/times or **recurring** messages (daily, weekly, monthly).
+  </Step>
+  <Step title="Timezone Support">
+    Configure messages with timezone awareness (defaults to Europe/Madrid, fully customizable).
+  </Step>
+  <Step title="File Attachments">
+    Attach images or videos up to 10MB that are automatically deleted after sending to save storage space.
+  </Step>
+  <Step title="Status Tracking">
+    Monitor message status: pending, processing, completed, failed, or paused.
+  </Step>
+</Steps>
+
+<Info>
+  Scheduled messages are processed by Laravel's queue system and scheduler. Files are stored in `storage/app/scheduled_messages/` and automatically cleaned up after delivery.
+</Info>
+
+### Template System
+
+Save time with reusable message templates:
+
+- **Save any message** as a template for reuse
+- **Dynamic variables** like `{{date}}`, `{{username}}` for personalization
+- **Template library** with quick preview and actions
+- **Share templates** with team members
+- **Categorization** for easy organization
+
+### Team Collaboration
+
+Work together effectively with granular permission controls:
+
+| Role | Permissions |
+|------|-------------|
+| **Admin** | Full management + invite others + delete webhook |
+| **Editor** | Edit webhook settings + send messages + view history |
+| **Viewer** | Read-only access + view history |
+
+<CardGroup cols={2}>
+  <Card title="Email Invitations" icon="envelope">
+    Invite team members via email with unique tokens and expiration dates.
+  </Card>
+  <Card title="Invitation Management" icon="list-check">
+    Accept, decline, or cancel invitations directly from the dashboard.
+  </Card>
+</CardGroup>
+
+### AI Content Generation
+
+Leverage artificial intelligence to create engaging content:
+
+<Note>
+  AI generation requires administrator configuration of API keys and per-user permission grants.
+</Note>
+
+**Supported AI Providers:**
+- OpenAI (GPT models)
+- Google Gemini
+
+**Features:**
+- Generate titles, descriptions, and message content
+- Daily usage limits (configurable per user)
+- Available in Quick Send, Webhooks, and Templates editors
+- Minimal "ghost" UI with premium animations
+
+**Usage Tracking:**
+Administrators can monitor AI usage with the `ai_usages` table that tracks requests per user.
+
+### Message History
+
+Track and analyze all webhook activity:
+
+- Detailed logs of every sent message
+- API response tracking (success/failure)
+- Filter by webhook, date range, or status
+- Full message content preservation
+- Integration with scheduled message history
+
+## Architecture Overview
+
+### Technology Stack
+
+<CodeGroup>
+```bash Backend
+Laravel 12.x
+PHP 8.4+
+PostgreSQL (production)
+SQLite (development)
+```
+
+```bash Frontend
+React + TypeScript
+Inertia.js
+Shadcn UI + Tailwind CSS
+Vite
+```
+
+```bash Infrastructure
+Redis (cache, sessions, queue)
+Nginx (web server)
+Supervisor (queue workers)
+Cron (Laravel scheduler)
+```
+</CodeGroup>
+
+### System Requirements
+
+<Warning>
+  Both **Supervisor** (for queue workers) and **Cron** (for scheduler) are **critical** for scheduled messages to function properly.
+</Warning>
+
+**Minimum Requirements:**
+- PHP 8.4 with extensions: BCMath, Ctype, Fileinfo, JSON, Mbstring, OpenSSL, PDO, PDO_PgSQL, Tokenizer, XML, Curl, Zip
+- Node.js 20+ with NPM
+- PostgreSQL 14+
+- Redis (recommended for production)
+- Nginx or Apache web server
+
+### How Scheduled Messages Work
+
+<Steps>
+  <Step title="Cron Trigger">
+    System cron runs `php artisan schedule:run` every minute.
+  </Step>
+  <Step title="Scheduler Check">
+    Laravel scheduler launches `scheduled-messages:process` command.
+  </Step>
+  <Step title="Message Selection">
+    Command finds messages where `next_send_at <= now()` and status is `pending`.
+  </Step>
+  <Step title="Queue Dispatch">
+    `SendScheduledMessage` job is dispatched to the queue.
+  </Step>
+  <Step title="Queue Worker Processing">
+    Worker sends the message to Discord API (multipart if files attached).
+    
+    - **For recurring messages:** Calculates next `next_send_at` and updates
+    - **For one-time messages:** Marks as `completed`
+    - **File cleanup:** Deletes physical files after successful send
+  </Step>
+</Steps>
+
+## Database Schema
+
+### Core Tables
+
+- **users** - User accounts with roles and AI access flags
+- **webhooks** - Webhook configurations with Discord metadata
+- **webhook_history** - Complete history of all sent messages
+- **templates** - Saved message templates
+
+### Automation Tables
+
+- **scheduled_messages** - Scheduled message configurations with recurrence settings
+- **scheduled_message_files** - Temporary file attachments for scheduled messages
+- **ai_usages** - AI generation usage tracking per user
+
+### Collaboration Tables
+
+- **webhook_collaborators** - User-to-webhook relationships with roles
+- **template_collaborators** - User-to-template relationships with roles
+- **invitations** - Pending invitations with tokens and expiration
+
+## Security & Best Practices
+
+<Warning>
+  Never commit sensitive credentials to version control. Always use environment variables in `.env` files.
+</Warning>
+
+**Security Features:**
+- Email verification required for new accounts
+- Two-factor authentication support
+- Password reset with rate limiting
+- Email rate limiting for invitations
+- Queue job retry logic with exponential backoff
+- Input validation on frontend (Zod) and backend (FormRequests)
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Community Management" icon="users-gear">
+    Schedule announcements, automate welcome messages, and coordinate team communications across Discord servers.
+  </Card>
+  <Card title="Content Publishing" icon="newspaper">
+    Publish blog updates, video releases, or podcast episodes automatically to Discord communities.
+  </Card>
+  <Card title="Event Reminders" icon="bell">
+    Send recurring reminders for events, meetings, or deadlines with customizable schedules.
+  </Card>
+  <Card title="Monitoring & Alerts" icon="triangle-exclamation">
+    Integrate with monitoring systems to send alerts and status updates via Discord webhooks.
+  </Card>
+</CardGroup>
+
+## License
+
+Discord Webhook Manager is licensed under **Creative Commons Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)**.
+
+**You can:**
+- Share and redistribute the material
+- Adapt, remix, and transform the material
+
+**Under these conditions:**
+- **Attribution**: Give appropriate credit with a link to the license
+- **Non-Commercial**: Cannot be used for commercial purposes
+
+For complete license details, see the [LICENSE](https://github.com/edgarqs/DiscordWebhook/blob/main/LICENSE) file.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+    Get up and running in minutes with your first webhook
+  </Card>
+  <Card title="Installation Guide" icon="server" href="/installation">
+    Deploy on your own infrastructure with Ubuntu Server
+  </Card>
+  <Card title="Message Editor" icon="palette" href="/features/message-editor">
+    Learn to create rich Discord messages with embeds
+  </Card>
+  <Card title="GitHub Repository" icon="github" href="https://github.com/edgarqs/DiscordWebhook">
+    View source code, report issues, and contribute
+  </Card>
+</CardGroup>

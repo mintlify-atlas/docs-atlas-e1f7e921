@@ -1,0 +1,563 @@
+---
+title: 'Message History & Analytics'
+description: 'Track, analyze, and review all messages sent through your Discord webhooks'
+icon: 'clock-rotate-left'
+---
+
+## Overview
+
+Message History provides comprehensive tracking of all messages sent through Discord Webhook Manager. Every message sent—whether manual or scheduled—is logged with full details including:
+
+- Message content and embeds
+- Delivery status (success/failed)
+- Timestamp
+- Sender information
+- Discord API responses
+
+<Note>
+Message history is automatically created for all webhook sends and is retained indefinitely unless manually deleted.
+</Note>
+
+## Accessing Message History
+
+There are multiple ways to view message history:
+
+### 1. Webhook-Specific History
+
+View history for a single webhook:
+
+<Steps>
+  <Step title="Navigate to Webhooks">
+    Go to **Webhooks** in the sidebar
+  </Step>
+  
+  <Step title="Select Webhook">
+    Click on the webhook you want to review
+  </Step>
+  
+  <Step title="View History">
+    Click the **History** tab or button to see all messages sent through this webhook
+  </Step>
+</Steps>
+
+**URL Pattern**: `/webhooks/{id}/history`
+
+**Code Reference**: `app/app/Controllers/WebhookController.php:351-364`
+
+### 2. Dashboard Overview
+
+The webhook detail page shows recent activity:
+
+```php
+$webhook->load(['messageHistory' => function ($query) {
+    $query->latest()->limit(10);
+}]);
+```
+
+This displays the 10 most recent messages inline (`app/app/Controllers/WebhookController.php:107-109`).
+
+### 3. Statistics View
+
+The webhook show page includes aggregated statistics (`app/app/Controllers/WebhookController.php:112-119`):
+
+```php
+$stats = [
+    'total' => $totalMessages,
+    'success' => $successMessages,
+    'error' => $errorMessages,
+    'recent' => $recentActivity, // Last 7 days
+];
+```
+
+## Message History Data Structure
+
+### Database Schema
+
+The `message_history` table stores:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | BIGINT | Primary key |
+| `webhook_id` | BIGINT | Associated webhook |
+| `user_id` | BIGINT | User who sent the message |
+| `message_content` | JSON | Full message payload |
+| `sent_at` | TIMESTAMP | When message was sent |
+| `status` | VARCHAR | `success` or `failed` |
+| `response` | JSON | Discord API response |
+| `created_at` | TIMESTAMP | Record creation |
+| `updated_at` | TIMESTAMP | Last update |
+
+### Message Content Format
+
+The `message_content` field stores the complete Discord payload:
+
+```json
+{
+  "content": "Hello, Discord!",
+  "embeds": [
+    {
+      "title": "Announcement",
+      "description": "Important update...",
+      "color": 5814783,
+      "fields": [
+        {
+          "name": "Version",
+          "value": "1.0.0",
+          "inline": true
+        }
+      ],
+      "timestamp": "2026-03-06T12:00:00Z",
+      "footer": {
+        "text": "Powered by Webhook Manager"
+      }
+    }
+  ]
+}
+```
+
+## Creating History Records
+
+### Successful Messages
+
+When a message sends successfully (`app/app/Controllers/WebhookController.php:321-328`):
+
+```php
+$webhook->messageHistory()->create([
+    'user_id' => auth()->id(),
+    'message_content' => $messageData,
+    'sent_at' => now(),
+    'status' => 'success',
+    'response' => $result['response'] ?? null,
+]);
+```
+
+### Failed Messages
+
+Failed attempts are also logged (`app/app/Controllers/WebhookController.php:335-341`):
+
+```php
+$webhook->messageHistory()->create([
+    'user_id' => auth()->id(),
+    'message_content' => $messageData,
+    'sent_at' => now(),
+    'status' => 'failed',
+    'response' => $result['response'] ?? null,
+]);
+```
+
+<Warning>
+Failed messages still appear in history. This helps you debug issues and track delivery problems.
+</Warning>
+
+## History Display
+
+### Pagination
+
+History pages show 20 messages per page:
+
+```php
+$messages = $webhook->messageHistory()
+    ->with('user:id,name')
+    ->latest('sent_at')
+    ->paginate(20);
+```
+
+**Code Reference**: `app/app/Controllers/WebhookController.php:355-358`
+
+### User Information
+
+Each history record includes the sender's name:
+
+```php
+->with('user:id,name')
+```
+
+This is useful for shared webhooks where multiple users send messages.
+
+## Analytics & Statistics
+
+### Webhook Performance Metrics
+
+The webhook detail page calculates key metrics:
+
+<CodeGroup>
+```php Total Messages
+$totalMessages = $webhook->messageHistory()->count();
+```
+
+```php Success Rate
+$successMessages = $webhook->messageHistory()
+    ->where('status', 'success')
+    ->count();
+    
+$successRate = ($successMessages / $totalMessages) * 100;
+```
+
+```php Error Count
+$errorMessages = $webhook->messageHistory()
+    ->where('status', 'failed')
+    ->count();
+```
+
+```php Recent Activity
+$recentActivity = $webhook->messageHistory()
+    ->where('sent_at', '>=', now()->subDays(7))
+    ->count();
+```
+</CodeGroup>
+
+**Code Reference**: `app/app/Controllers/WebhookController.php:112-119`
+
+### Time-Based Analysis
+
+<Tip>
+You can extend analytics by grouping messages by hour, day, or month to identify usage patterns.
+</Tip>
+
+Example query for daily message counts:
+
+```php
+$dailyStats = MessageHistory::where('webhook_id', $webhook->id)
+    ->selectRaw('DATE(sent_at) as date, COUNT(*) as count')
+    ->groupBy('date')
+    ->orderBy('date', 'desc')
+    ->limit(30)
+    ->get();
+```
+
+## Permissions & Access Control
+
+Message history respects webhook permissions:
+
+### View Permission
+
+Users can view history if they can view the webhook (`app/app/Controllers/WebhookController.php:353`):
+
+```php
+$this->authorize('view', $webhook);
+```
+
+This allows:
+- Webhook owners
+- Collaborators with any permission level (admin, editor, viewer)
+
+### Privacy Considerations
+
+<Warning>
+All users with access to a webhook can see its complete message history, including messages sent by other users.
+</Warning>
+
+This is by design to enable team coordination, but be aware when sharing webhooks with sensitive content.
+
+## Discord API Responses
+
+The `response` field stores Discord's API response:
+
+### Success Response Example
+
+```json
+{
+  "id": "1234567890123456789",
+  "type": 0,
+  "content": "Hello, Discord!",
+  "channel_id": "9876543210987654321",
+  "author": {
+    "id": "1111111111111111111",
+    "username": "My Webhook",
+    "avatar": null,
+    "discriminator": "0000",
+    "bot": true
+  },
+  "attachments": [],
+  "embeds": [...],
+  "mentions": [],
+  "mention_roles": [],
+  "pinned": false,
+  "mention_everyone": false,
+  "tts": false,
+  "timestamp": "2026-03-06T12:00:00.000Z",
+  "edited_timestamp": null,
+  "flags": 0
+}
+```
+
+### Error Response Example
+
+```json
+{
+  "message": "Invalid Webhook Token",
+  "code": 10015
+}
+```
+
+Common Discord error codes:
+
+| Code | Meaning |
+|------|--------|
+| 10015 | Unknown Webhook |
+| 50027 | Invalid Webhook Token |
+| 50035 | Invalid Form Body (validation error) |
+| 40005 | Request entity too large (file too big) |
+
+## Filtering and Search
+
+### By Status
+
+Filter messages by delivery status:
+
+```php
+// Only successful messages
+$successful = $webhook->messageHistory()
+    ->where('status', 'success')
+    ->get();
+
+// Only failed messages
+$failed = $webhook->messageHistory()
+    ->where('status', 'failed')
+    ->get();
+```
+
+### By Date Range
+
+Find messages in a specific time period:
+
+```php
+$messages = $webhook->messageHistory()
+    ->whereBetween('sent_at', [
+        Carbon::parse('2026-03-01'),
+        Carbon::parse('2026-03-31')
+    ])
+    ->get();
+```
+
+### By User
+
+For shared webhooks, filter by sender:
+
+```php
+$userMessages = $webhook->messageHistory()
+    ->where('user_id', $userId)
+    ->get();
+```
+
+## Message History in Scheduled Messages
+
+Scheduled messages also create history records when they send. The main difference is the `user_id` reflects who created the schedule, not who triggered the send (since it's automated).
+
+**Identifying Scheduled Messages:**
+
+You can track whether a message was manually sent or scheduled by checking if it has a corresponding `scheduled_message_id` (if you extend the schema to include this relationship).
+
+## Exporting History
+
+<Tip>
+While not implemented in the base application, you can easily add CSV/JSON export functionality using Laravel's response helpers.
+</Tip>
+
+Example export to CSV:
+
+```php
+use Illuminate\Support\Facades\Response;
+
+public function export(Webhook $webhook)
+{
+    $this->authorize('view', $webhook);
+    
+    $messages = $webhook->messageHistory()->get();
+    
+    $csv = Writer::createFromString('');
+    $csv->insertOne(['ID', 'User', 'Status', 'Sent At']);
+    
+    foreach ($messages as $message) {
+        $csv->insertOne([
+            $message->id,
+            $message->user->name,
+            $message->status,
+            $message->sent_at->format('Y-m-d H:i:s'),
+        ]);
+    }
+    
+    return Response::make($csv->toString(), 200, [
+        'Content-Type' => 'text/csv',
+        'Content-Disposition' => 'attachment; filename="history.csv"',
+    ]);
+}
+```
+
+## Retention and Cleanup
+
+### Storage Considerations
+
+Message history grows continuously. Consider implementing automatic cleanup:
+
+```php
+// Delete history older than 90 days
+MessageHistory::where('sent_at', '<', now()->subDays(90))->delete();
+```
+
+You can run this as a scheduled command:
+
+```php
+// app/Console/Kernel.php
+$schedule->call(function () {
+    MessageHistory::where('sent_at', '<', now()->subDays(90))->delete();
+})->monthly();
+```
+
+<Warning>
+**Important**: Deleting history is permanent and cannot be undone. Implement this carefully based on your compliance and audit requirements.
+</Warning>
+
+### Archive Strategy
+
+For long-term retention with reduced storage:
+
+1. Export old history to compressed JSON files
+2. Store in S3 or cold storage
+3. Delete from active database
+4. Provide "restore from archive" functionality if needed
+
+## Debugging Failed Messages
+
+### Common Failure Patterns
+
+**Invalid Webhook URL:**
+```json
+{
+  "status": "failed",
+  "response": {
+    "message": "Unknown Webhook",
+    "code": 10015
+  }
+}
+```
+
+**Validation Errors:**
+```json
+{
+  "status": "failed",
+  "response": {
+    "message": "Invalid Form Body",
+    "code": 50035,
+    "errors": {
+      "embeds": {
+        "0": {
+          "title": {
+            "_errors": [
+              {
+                "code": "BASE_TYPE_MAX_LENGTH",
+                "message": "Must be 256 or fewer in length."
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+**Rate Limiting:**
+```json
+{
+  "status": "failed",
+  "response": {
+    "message": "You are being rate limited.",
+    "retry_after": 64000,
+    "global": false
+  }
+}
+```
+
+### Troubleshooting Steps
+
+<Steps>
+  <Step title="Check Error Response">
+    Review the `response` field in the failed message record
+  </Step>
+  
+  <Step title="Verify Webhook URL">
+    Ensure the webhook still exists in Discord and hasn't been deleted
+  </Step>
+  
+  <Step title="Validate Content">
+    Check that message content respects Discord limits:
+    - Content: 2000 characters max
+    - Embeds: 10 max per message
+    - Embed title: 256 characters max
+    - Embed description: 4096 characters max
+  </Step>
+  
+  <Step title="Test Manually">
+    Try sending a simple test message through the same webhook
+  </Step>
+</Steps>
+
+## Performance Optimization
+
+### Database Indexing
+
+Ensure proper indexes for common queries:
+
+```sql
+CREATE INDEX idx_message_history_webhook_id ON message_history(webhook_id);
+CREATE INDEX idx_message_history_sent_at ON message_history(sent_at);
+CREATE INDEX idx_message_history_status ON message_history(status);
+CREATE INDEX idx_message_history_user_id ON message_history(user_id);
+```
+
+### Query Optimization
+
+For large history tables, use chunking for bulk operations:
+
+```php
+MessageHistory::where('webhook_id', $webhookId)
+    ->chunk(1000, function ($messages) {
+        foreach ($messages as $message) {
+            // Process each message
+        }
+    });
+```
+
+### Eager Loading
+
+Always eager load relationships to avoid N+1 queries:
+
+```php
+$messages = $webhook->messageHistory()
+    ->with(['user:id,name,email'])
+    ->latest()
+    ->paginate(20);
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Regular Review" icon="magnifying-glass">
+    Periodically review failed messages to identify webhook issues or validation problems.
+  </Card>
+  
+  <Card title="Set Retention Policy" icon="calendar">
+    Define how long to keep history based on your compliance and storage constraints.
+  </Card>
+  
+  <Card title="Monitor Success Rate" icon="chart-line">
+    Track delivery success rate over time to catch degraded performance early.
+  </Card>
+  
+  <Card title="Use for Auditing" icon="shield">
+    Leverage history for compliance auditing and tracking who sent what.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Webhooks" icon="webhook" href="/features/webhooks">
+    Learn more about webhook management
+  </Card>
+  
+  <Card title="Scheduled Messages" icon="clock" href="/advanced/automation">
+    Automate message delivery
+  </Card>
+</CardGroup>

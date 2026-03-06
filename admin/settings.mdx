@@ -1,0 +1,480 @@
+---
+title: 'Platform Settings'
+description: 'Configure system-wide settings, AI integration, and authentication options'
+icon: 'gear'
+---
+
+The Platform Settings panel allows administrators to configure global settings that affect all users on the Discord Webhook Manager platform.
+
+## Access Settings
+
+Platform settings are embedded in the admin dashboard at `/admin`. You can view and update settings directly from the dashboard interface.
+
+<Warning>
+  **Admin Only**: All settings require admin role and password confirmation. Changes affect all users immediately.
+</Warning>
+
+## Available Settings
+
+The platform provides several categories of settings:
+
+### Authentication Settings
+
+Control user authentication and account management:
+
+<CardGroup cols={2}>
+  <Card title="Registration Enabled" icon="user-plus">
+    **Type**: Boolean  
+    **Default**: `true`
+    
+    Controls whether new users can register accounts on the platform.
+  </Card>
+  
+  <Card title="Password Reset Enabled" icon="key">
+    **Type**: Boolean  
+    **Default**: `true`
+    
+    Controls whether users can reset their passwords via email.
+  </Card>
+</CardGroup>
+
+<Note>
+  **Use Case**: Disable registration when you want a closed platform. Disable password reset if you manage passwords through an external system.
+</Note>
+
+### AI Integration Settings
+
+Configure artificial intelligence features for content generation:
+
+<CardGroup cols={1}>
+  <Card title="AI Provider" icon="brain">
+    **Type**: String (`openai` or `gemini`)  
+    **Default**: `openai`
+    
+    Selects which AI provider to use for content generation.
+    
+    **Supported Providers**:
+    - `openai` - OpenAI GPT models
+    - `gemini` - Google Gemini models
+  </Card>
+  
+  <Card title="OpenAI API Key" icon="key">
+    **Type**: String (optional)  
+    **Default**: Empty
+    
+    API key for OpenAI integration. Required if AI provider is set to `openai`.
+  </Card>
+  
+  <Card title="Gemini API Key" icon="key">
+    **Type**: String (optional)  
+    **Default**: Empty
+    
+    API key for Google Gemini integration. Required if AI provider is set to `gemini`.
+  </Card>
+  
+  <Card title="AI Daily Limit" icon="chart-line">
+    **Type**: Integer (minimum: 1)  
+    **Default**: `5`
+    
+    Maximum number of AI generations per user per day. Admins have unlimited usage.
+  </Card>
+</CardGroup>
+
+## Retrieving Settings
+
+Settings are stored in the `settings` table and retrieved through the `Setting` model:
+
+### Basic Retrieval
+
+From `Setting.php:15-26`:
+
+```php
+public static function get(string $key, $default = null)
+{
+    return Cache::remember("setting.{$key}", 3600, function () use ($key, $default) {
+        $setting = self::where('key', $key)->first();
+        
+        if (!$setting) {
+            return $default;
+        }
+
+        return self::castValue($setting->value, $setting->type);
+    });
+}
+```
+
+<Note>
+  Settings are cached for 1 hour (3600 seconds) for performance. The cache is automatically cleared when settings are updated.
+</Note>
+
+### Helper Methods
+
+The `Setting` model provides convenient helper methods:
+
+```php
+// Check if registration is enabled
+Setting::isRegistrationEnabled(); // returns boolean
+
+// Check if password reset is enabled
+Setting::isPasswordResetEnabled(); // returns boolean
+
+// Get AI provider
+$provider = Setting::get('ai_provider', 'openai');
+
+// Get AI daily limit
+$limit = Setting::get('ai_daily_limit', 5);
+```
+
+## Updating Settings
+
+Settings can be updated through the admin dashboard or programmatically:
+
+### Admin Dashboard Update
+
+The settings form submits to `/admin/settings` (POST).
+
+From `web.php:136-161`:
+
+```php
+Route::post('admin/settings', function (\Illuminate\Http\Request $request) {
+    $request->validate([
+        'registration_enabled' => 'required|boolean',
+        'password_reset_enabled' => 'required|boolean',
+        'ai_provider' => 'required|string|in:openai,gemini',
+        'openai_api_key' => 'nullable|string',
+        'gemini_api_key' => 'nullable|string',
+        'ai_daily_limit' => 'required|integer|min:1',
+    ]);
+
+    Setting::set('registration_enabled', $request->registration_enabled, 'boolean');
+    Setting::set('password_reset_enabled', $request->password_reset_enabled, 'boolean');
+    Setting::set('ai_provider', $request->ai_provider, 'string');
+
+    if ($request->filled('openai_api_key')) {
+        Setting::set('openai_api_key', $request->openai_api_key, 'string');
+    }
+
+    if ($request->filled('gemini_api_key')) {
+        Setting::set('gemini_api_key', $request->gemini_api_key, 'string');
+    }
+
+    Setting::set('ai_daily_limit', $request->ai_daily_limit, 'integer');
+
+    return redirect()->back()->with('success', 'Settings updated successfully.');
+})->name('admin.settings.update');
+```
+
+### Programmatic Update
+
+From `Setting.php:31-41`:
+
+```php
+public static function set(string $key, $value, string $type = 'string'): void
+{
+    $stringValue = is_bool($value) ? ($value ? '1' : '0') : (string) $value;
+
+    self::updateOrCreate(
+        ['key' => $key],
+        ['value' => $stringValue, 'type' => $type]
+    );
+
+    Cache::forget("setting.{$key}");
+}
+```
+
+<Steps>
+  <Step title="Validate Input">
+    Ensure the value matches the expected type and constraints
+  </Step>
+  
+  <Step title="Update or Create">
+    Uses `updateOrCreate` to insert new settings or update existing ones
+  </Step>
+  
+  <Step title="Clear Cache">
+    Automatically clears the cached value for immediate effect
+  </Step>
+</Steps>
+
+## Setting Types and Casting
+
+Settings are stored as strings but automatically cast to the correct type:
+
+From `Setting.php:62-71`:
+
+```php
+private static function castValue($value, string $type)
+{
+    return match ($type) {
+        'boolean' => (bool) $value,
+        'integer' => (int) $value,
+        'float' => (float) $value,
+        'json' => json_decode($value, true),
+        default => $value,
+    };
+}
+```
+
+### Supported Types
+
+- **boolean**: Cast to `true`/`false`
+- **integer**: Cast to integer
+- **float**: Cast to floating point number
+- **json**: Parsed from JSON string to array
+- **string**: Returned as-is (default)
+
+## AI Settings Deep Dive
+
+### How AI Integration Works
+
+<Steps>
+  <Step title="User Requests Generation">
+    User clicks AI generation button in message editor
+  </Step>
+  
+  <Step title="Permission Check">
+    System verifies user has `can_use_ai` flag enabled
+  </Step>
+  
+  <Step title="Daily Limit Check">
+    For non-admins, verify they haven't exceeded daily limit
+  </Step>
+  
+  <Step title="Provider Selection">
+    System uses configured AI provider from settings
+  </Step>
+  
+  <Step title="API Call">
+    Request sent to OpenAI or Gemini API
+  </Step>
+  
+  <Step title="Usage Recording">
+    For non-admins, usage is recorded in `ai_usages` table
+  </Step>
+</Steps>
+
+### AI Usage Enforcement
+
+From `AiController.php:26-38`:
+
+```php
+if (!$user->isAdmin()) {
+    $dailyLimit = \App\Models\Setting::get('ai_daily_limit', 5);
+    $usageCount = \App\Models\AiUsage::where('user_id', $user->id)
+        ->whereDate('created_at', now()->today())
+        ->count();
+
+    if ($usageCount >= $dailyLimit) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Has alcanzado el límite diario de uso de la IA'
+        ], 429);
+    }
+}
+```
+
+<Warning>
+  **API Key Security**: API keys are stored in plain text in the database. Ensure your database is properly secured and backed up. Consider encrypting sensitive settings in production.
+</Warning>
+
+### AI Provider Configuration
+
+<Tabs>
+  <Tab title="OpenAI">
+    **Requirements**:
+    - Valid OpenAI API key
+    - Access to GPT models
+    - Set `ai_provider` to `openai`
+    
+    **Configuration**:
+    ```php
+    Setting::set('ai_provider', 'openai', 'string');
+    Setting::set('openai_api_key', 'sk-...', 'string');
+    ```
+    
+    **Model Used**: GPT-4 or GPT-3.5-turbo (configured in `AiService`)
+  </Tab>
+  
+  <Tab title="Google Gemini">
+    **Requirements**:
+    - Valid Google Cloud API key
+    - Gemini API access enabled
+    - Set `ai_provider` to `gemini`
+    
+    **Configuration**:
+    ```php
+    Setting::set('ai_provider', 'gemini', 'string');
+    Setting::set('gemini_api_key', 'AIza...', 'string');
+    ```
+    
+    **Model Used**: Gemini Pro (configured in `AiService`)
+  </Tab>
+</Tabs>
+
+## Authentication Settings Deep Dive
+
+### Registration Control
+
+When registration is disabled:
+
+- Registration form is hidden from the welcome page
+- Registration routes return errors
+- Invitation system continues to work for admins
+
+```php
+// From web.php:13
+'canRegister' => Features::enabled(Features::registration()),
+```
+
+The registration setting integrates with Laravel Fortify's features system.
+
+### Password Reset Control
+
+When password reset is disabled:
+
+- "Forgot Password" link is hidden
+- Password reset routes return errors
+- Admins can still change passwords in user management
+
+<Note>
+  **External Authentication**: If you use external authentication (OAuth, SSO, LDAP), you may want to disable both registration and password reset features.
+</Note>
+
+## Database Schema
+
+Settings are stored in the `settings` table:
+
+```sql
+CREATE TABLE settings (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    key VARCHAR(255) NOT NULL UNIQUE,
+    value TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL DEFAULT 'string',
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL
+);
+```
+
+### Example Records
+
+```sql
+INSERT INTO settings (key, value, type) VALUES
+    ('registration_enabled', '1', 'boolean'),
+    ('password_reset_enabled', '1', 'boolean'),
+    ('ai_provider', 'openai', 'string'),
+    ('ai_daily_limit', '5', 'integer');
+```
+
+## Cache Management
+
+Settings are cached for performance but can be manually cleared:
+
+```php
+// Clear all settings cache
+Setting::clearCache();
+
+// Clear specific setting cache
+Cache::forget('setting.ai_provider');
+```
+
+From `Setting.php:76-83`:
+
+```php
+public static function clearCache(): void
+{
+    $settings = self::all();
+    foreach ($settings as $setting) {
+        Cache::forget("setting.{$setting->key}");
+    }
+}
+```
+
+<Note>
+  Cache is automatically cleared when settings are updated via `Setting::set()`. Manual clearing is only needed for debugging or after direct database modifications.
+</Note>
+
+## Best Practices
+
+<Steps>
+  <Step title="Backup Before Changes">
+    Always backup settings before making significant changes, especially API keys
+  </Step>
+  
+  <Step title="Test AI Integration">
+    After updating AI settings, test with a non-admin account to verify limits work
+  </Step>
+  
+  <Step title="Monitor API Usage">
+    Keep track of AI API usage to manage costs and set appropriate daily limits
+  </Step>
+  
+  <Step title="Document Changes">
+    Keep a log of setting changes for audit purposes
+  </Step>
+  
+  <Step title="Communicate to Users">
+    Inform users when you disable registration or change AI limits
+  </Step>
+</Steps>
+
+## Security Considerations
+
+<Warning>
+  **API Key Protection**:
+  - Never commit API keys to version control
+  - Rotate keys periodically
+  - Use environment variables for additional security layer
+  - Monitor API usage for unauthorized access
+  - Implement IP restrictions if your AI provider supports it
+</Warning>
+
+### Recommended Security Measures
+
+1. **Encrypt API Keys**: Consider using Laravel's encryption for sensitive settings
+2. **Audit Logging**: Log all setting changes with admin user information
+3. **Rate Limiting**: AI generation route already has throttling (`throttle:10,1`)
+4. **Regular Reviews**: Periodically review AI usage patterns and adjust limits
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Settings not taking effect">
+    Check:
+    - Cache has been cleared (`php artisan cache:clear`)
+    - Database record was actually updated
+    - No environment variables overriding settings
+  </Accordion>
+  
+  <Accordion title="AI generation failing">
+    Verify:
+    - API key is valid and active
+    - AI provider setting matches the key provided
+    - User has `can_use_ai` enabled
+    - User hasn't exceeded daily limit
+    - API provider service is operational
+  </Accordion>
+  
+  <Accordion title="Cannot update settings">
+    Ensure:
+    - You're logged in as admin
+    - Password was recently confirmed
+    - Form validation is passing
+    - Database connection is working
+  </Accordion>
+</AccordionGroup>
+
+## Related Documentation
+
+<CardGroup cols={3}>
+  <Card title="User Management" icon="users-gear" href="/admin/user-management">
+    Manage AI permissions for individual users
+  </Card>
+  
+  <Card title="AI Tools" icon="wand-magic-sparkles" href="/ai-tools/overview">
+    Learn about AI content generation features
+  </Card>
+  
+  <Card title="Dashboard" icon="gauge-high" href="/admin/dashboard">
+    Return to admin dashboard overview
+  </Card>
+</CardGroup>
