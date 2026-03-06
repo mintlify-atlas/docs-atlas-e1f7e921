@@ -1,0 +1,114 @@
+{
+  "projectType": "saas",
+  "projectName": "Discord Webhook Manager",
+  "projectDescription": "A powerful SaaS platform for managing, scheduling, and automating Discord webhook messages with team collaboration and AI-powered content generation.",
+  "theme": "almond",
+  "primaryColor": "#07d3b4",
+  "lightColor": "#0c698c",
+  "darkColor": "#0b1717",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/webhooks",
+              "features/message-editor",
+              "features/templates",
+              "features/scheduled-messages"
+            ]
+          },
+          {
+            "group": "Collaboration",
+            "pages": [
+              "collaboration/team-invitations",
+              "collaboration/permissions",
+              "collaboration/sharing"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/ai-generation",
+              "advanced/automation",
+              "advanced/message-history"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/requirements",
+              "deployment/ubuntu-server",
+              "deployment/configuration",
+              "deployment/worker-setup"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Admin Guide",
+        "groups": [
+          {
+            "group": "Administration",
+            "pages": [
+              "admin/dashboard",
+              "admin/user-management",
+              "admin/scheduled-messages",
+              "admin/settings"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api/overview",
+              "api/webhooks",
+              "api/messages",
+              "api/templates",
+              "api/scheduled"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Visual Discord message editor with real-time preview",
+    "Scheduled and recurring message automation",
+    "Team collaboration with granular permissions",
+    "Reusable message templates with dynamic variables",
+    "AI-powered content generation (OpenAI/Gemini)",
+    "Advanced webhook management and validation",
+    "Comprehensive message history and analytics",
+    "Admin dashboard for platform management"
+  ],
+  "publicApiSurface": [
+    "POST /webhooks/validate - Validate Discord webhook URL",
+    "POST /webhooks/{webhook}/send - Send message to webhook",
+    "POST /send/temporary - Send to temporary webhook without saving",
+    "GET /webhooks/{webhook}/history - Get message history",
+    "POST /scheduled - Create scheduled message",
+    "POST /scheduled/{scheduled}/pause - Pause scheduled message",
+    "POST /scheduled/{scheduled}/resume - Resume scheduled message",
+    "POST /templates - Create message template",
+    "POST /templates/{template}/duplicate - Duplicate template",
+    "POST /ai/generate - Generate content with AI",
+    "POST /webhooks/{webhook}/collaborators - Invite collaborator",
+    "POST /invitations/{token}/accept - Accept invitation",
+    "GET /admin/scheduled-messages - Admin view all scheduled messages"
+  ]
+}
